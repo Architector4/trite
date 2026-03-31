@@ -1,0 +1,75 @@
+[package]
+name = "bevy_mod_time_travel"
+version = "0.1.0"
+edition = "2024"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+description = "Facilities for world state snapshot management and interpolation in Bevy."
+
+keywords = ["bevy", "interpolation", "snapshot", "rollback", "multiplayer"]
+categories = ["game-development"]
+
+
+[dependencies]
+
+# Mandatory, obviously.
+bevy_ecs = { version = "0.18.0", default-features = false }
+
+# For when not using std feature; unused otherwise.
+# Note: bevy_ecs depends on bevy_platform which enables spin features "mutex" and "spin_mutex" unconditionally.
+spin = { version = "0.10.0", default-features = false }
+
+# For interpolation feature.
+bevy_time = { version = "0.18.0", default-features = false, optional = true }
+bevy_app = { version = "0.18.0", default-features = false, optional = true }
+
+# For interpolation_for_transform feature.
+bevy_transform = { version = "0.18.0", default-features = false, features = ["bevy-support"], optional = true }
+
+# For bevy_animation feature.
+# Note: bevy_animation uses std and bevy_reflect unconditionally.
+bevy_animation = { version = "0.18.0", default-features = false, optional = true }
+
+# For bevy_reflect feature.
+bevy_reflect = { version = "0.18.0", default-features = false, optional = true }
+
+# For logging feature.
+bevy_log = { version = "0.18.0", optional = true }
+
+
+[features]
+
+# All the good stuff UwU
+default = ["std", "bevy_animation", "interpolation", "bevy_reflect", "interpolation_for_transform", "logging"]
+
+# Usage of the standard library.
+std = ["bevy_ecs/std", "bevy_app/std", "bevy_time?/std", "bevy_reflect?/std", "bevy_transform?/std", "bevy_time?/std"]
+
+# Interpolation plugin.
+interpolation = ["dep:bevy_time", "dep:bevy_app"]
+
+# Interpolation plugin's builtin handling of Transform components.
+interpolation_for_transform = ["dep:bevy_transform", "interpolation"]
+
+# Mostly for convenience methods using the "Animatable" trait.
+bevy_animation = ["std", "dep:bevy_animation", "bevy_reflect"]
+
+# Reflection for the types within this crate.
+bevy_reflect = ["dep:bevy_reflect", "bevy_ecs/bevy_reflect", "bevy_app?/bevy_reflect", "bevy_transform?/bevy_reflect", "bevy_time?/bevy_reflect"]
+
+# If you enable "logging" the crate does "logging" via "bevy_log" logging facility of logging. Logging.
+logging = ["dep:bevy_log"]
+
+# Mostly just a glue feature to check for compiler warnings/errors when building the crate in a no-std environment.
+bevy_transform-libm = ["bevy_transform?/libm"]
+
+
+[dev-dependencies]
+# Just for the examples.
+bevy = "0.18.0"
+
+
+# For this tool:
+# https://github.com/frewsxcv/cargo-all-features
+[package.metadata.cargo-all-features]
+always_include_features = [ "bevy_transform-libm" ]

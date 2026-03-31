@@ -1,0 +1,4 @@
+/target
+
+# rust-analyzer loves spilling those around lol
+.cache

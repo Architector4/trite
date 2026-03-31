@@ -1,0 +1,12 @@
+[package]
+name = "scratchpad"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = { version = "0.18.0", features = ["dynamic_linking", "track_location"] }
+bevy-inspector-egui = "0.36.0"
+bevy_egui = "0.39.0"
+bevy_mod_time_travel = { version = "0.1.0", path = "../bevy_mod_time_travel" }
+#avian3d = { version = "0.6.0", default-features = false, features = ["3d", "default-collider", "parry-f64", "parallel", "simd", "debug-plugin", "f64"] }
+avian3d = { version = "0.6.0" }

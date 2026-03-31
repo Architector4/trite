@@ -1,0 +1,10 @@
+[package]
+name = "ensure_no_std"
+version = "0.1.0"
+edition = "2024"
+
+# This crate's code is almost entirely from here:
+# https://blog.dbrgn.ch/2019/12/24/testing-for-no-std-compatibility/
+
+[dependencies]
+bevy_mod_time_travel = { path = "../bevy_mod_time_travel", default-features = false }
