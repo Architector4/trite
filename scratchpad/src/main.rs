@@ -42,7 +42,7 @@ use scratchpad::{
     trajectory_prediction::{NowPredicting, Predicted, PredictionPlugin},
 };
 
-use avian3d::prelude::*;
+use avian3d::{physics_transform::PhysicsTransformConfig, prelude::*};
 
 fn main() {
     let mut app = App::new();
@@ -249,10 +249,10 @@ fn setup(
         },
     ));
 
-    //commands.insert_resource(PhysicsTransformConfig {
-    //    transform_to_position: false,
-    //    ..default()
-    //});
+    commands.insert_resource(PhysicsTransformConfig {
+        transform_to_position: false,
+        ..default()
+    });
 
     let camera_transform =
         Transform::from_xyz(0.8, 2.7, 3.0).looking_at(Vec3::new(0.0, 1.0, 0.0), Vec3::Y);
