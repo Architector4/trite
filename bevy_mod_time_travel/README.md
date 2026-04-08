@@ -14,30 +14,30 @@ use the rest of the crate. See module `interpolation` for details.
 
 - `#![no_std]` support.
 - A complete interpolation plugin.
-- Tracking, rewinding, and interpolating multiple coexisting sets of timelines of world state
-  separately.
+- Tracking, rewinding, and interpolating multiple coexisting continuums of world state separately.
 - Tracking, rewinding, and interpolating any arbitrary components and resources.
 - Best-effort preservation of change detection state when rewinding, or options for otherwise.
 - A method for tracking change in relation to the timeline.
-- Quick and easy API to "time travel" a world across a timeline once you're set up.
+- Quick and easy API to "time travel" a world across a continuum once you're set up.
 
 # Here you don't get:
 
 These things the crate currently does **not** do, but might in some future:
 - API for tracking/rewinding/interpolating only specific entities and resources. These can be
-  grouped into separate timelines instead.
-- Automatically inserting time travel systems per timeline per component and resource. For this,
-  use items in the `registration` module.
+  grouped into separate continuums instead if needed
+- Automatically inserting time travel systems per timeline (i.e. per component/resource). For this,
+  use `WorldTimeTravel::register_timeline` on the relevant timeline.
 - Any interaction with `Local` parameters of systems, including message reader cursors. Because of
   this, Bevy messages are not supported.
 - Any interpolation that involves more than just two points of input data and a single scalar
-  factor, like Hermite interpolation. It is possible to implement such, but none are provided here.
+  factor; for example Hermite interpolation. It is possible to implement such, but no API is
+  provided for this here.
 - Handling of entity deletion. In Bevy, deleting an entity is guaranteed to despawn it. This will
-  always also destroy timeline components on it, unlink relations, and its exact entity ID is not
-  guaranteed to be available to respawn as is.
+  always also destroy timeline components on it, unlink relations, cause relevant events/observers
+  to fire, and its exact entity ID is not guaranteed to be available to respawn as is.
 - Anything relating to events or observers. I'm not as intimately familiar with those features of
   Bevy, and I'm unsure if there's anything of use I could do with them here either way.
-- Any optimization with `PartialEq` yet.
+- Any optimization with `PartialEq`, yet.
 
 # "Pick B" behavior
 
@@ -49,9 +49,9 @@ interpolation factor is closer to one or the other.
 
 The biggest rationale towards this decision is that it makes the most sense in the use case of basic
 interpolation like in the `InterpolationPlugin`. This way, with that plugin, everything that is not
-interpolatable matches up with everything that lies outside of what the interpolation timelines
-track, which also happens to match up with the latest available state of the world in general. Any
-other behavior could cause a lot of unnecessary creations/deletions of components as well as less
+interpolatable matches up with everything that lies outside of what the interpolation continuum
+tracks, which also happens to match up with the latest available state of the world in general. Any
+other behavior could cause a lot of unnecessary creations/deletions of components, as well as less
 predictable behavior.
 
 # Example
@@ -116,17 +116,16 @@ assert_eq!(new_transform.translation.z, 0.5);
 
 All features are enabled by default except `bevy_transform-libm`:
 
-- `std` - enables `std` support. This does not add any new features, but is recommended to enable if
-  possible, as it allows for extra optimizations.
-- `interpolation` - enables `interpolation` module.
-- `interpolation_for_transform` - if enabled, makes `InterpolationPlugin` automatically handle
-  interpolation for `Transform` components. Enables `interpolation` feature flag, obviously.
-- `bevy_animation` - enables support for convenience functions for registering components/resources
-  that implement `Animatable` trait in Bevy's Animation crate. Enables `std` and `bevy_reflect`.
+- `bevy_animation` - enables a convenience method for using
+  `bevy_animation::Animatable::interpolate` as the interpolation function when registering a
+  timeline. Enables `std` and `bevy_reflect`.
 - `bevy_reflect` - enables Bevy's reflection support for all types in the crate.
-- `logging` - enables logging.
 - `bevy_transform-libm` - internal feature used for development. Enables `libm` feature in
   `bevy_transform` crate if `interpolation_for_transform` feature is enabled. Using this is not
   recommended.
-
-
+- `interpolation_for_transform` - if enabled, makes `InterpolationPlugin` automatically handle
+  interpolation for `Transform` components. Enables `interpolation` feature flag, obviously.
+- `interpolation` - enables `interpolation` module.
+- `logging` - enables logging in `WorldTimeTravel` methods.
+- `std` - enables `std` support. This does not add any new features, but is recommended to enable if
+  possible, as it allows for extra optimizations.
