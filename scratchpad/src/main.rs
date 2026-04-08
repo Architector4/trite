@@ -76,9 +76,6 @@ fn main() {
     app.world_mut()
         .insert_resource(DefaultRestitution(Restitution::new(0.5)));
 
-    app.world_mut()
-        .insert_resource(DirectionalLightShadowMap { size: 4096 });
-
     //app.world_mut().insert_resource(TimeToSleep(0.1));
 
     //app.world_mut().insert_resource(DefaultFriction(Friction {
