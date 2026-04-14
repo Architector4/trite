@@ -24,7 +24,7 @@ use std::{collections::VecDeque, time::Duration};
 use bevy::{
     ecs::entity_disabling::Disabled,
     input::{ButtonState, keyboard::KeyboardInput},
-    light::{CascadeShadowConfigBuilder, DirectionalLightShadowMap},
+    light::CascadeShadowConfigBuilder,
     prelude::*,
     window::PrimaryWindow,
 };
