@@ -19,6 +19,29 @@ use super::continuum::{Timeline, TimelineComponent, TimelineResource};
 use super::schedules::*;
 use super::{InterpFunc, pick_b_if_nonzero};
 
+/// Error that signifies that the timeline you're trying to register has already been registered.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "bevy_reflect", derive(bevy_reflect::Reflect))]
+pub struct AlreadyRegisteredError;
+
+impl core::fmt::Display for AlreadyRegisteredError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("Timeline was already registered")
+    }
+}
+
+impl core::fmt::Debug for AlreadyRegisteredError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Display::fmt(self, f)
+    }
+}
+
+impl core::error::Error for AlreadyRegisteredError {
+    fn description(&self) -> &'static str {
+        "The specified timeline was already registered into this world."
+    }
+}
+
 /// Represents an unspecified interpolation or reflection function. If you've run into a compiler
 /// error with this, you might have missed specifying an interpolation function when registering
 /// your timeline.
@@ -161,7 +184,24 @@ impl<T: TimelineComponent, Interp: InterpFunc<T::Item>, Reflect: Fn(&mut World)>
     RegisterTimeline<'_, T, Interp, Reflect>
 {
     /// Register this component timeline with reflection.
+    ///
+    /// # Panics
+    /// Panics if this was already done for this timeline.
+    ///
+    /// For a version that errors instead, use [`Self::try_register_component`].
+    #[inline]
+    #[track_caller]
     pub fn register_component(self) {
+        if let Err(AlreadyRegisteredError) = self.try_register_component() {
+            panic!("{}", AlreadyRegisteredError);
+        }
+    }
+
+    /// Try to register this component timeline with reflection.
+    ///
+    /// # Errors
+    /// Errors if this was already done for this timeline.
+    pub fn try_register_component(self) -> Result<(), AlreadyRegisteredError> {
         (self.reflect_func)(self.world);
 
         // Now that we ran the reflect function, clear that, and run the non-reflect variant of
@@ -173,7 +213,7 @@ impl<T: TimelineComponent, Interp: InterpFunc<T::Item>, Reflect: Fn(&mut World)>
             reflect_func: Unspecified,
         };
 
-        noreflect.register_component();
+        noreflect.try_register_component()
     }
 }
 
@@ -182,14 +222,36 @@ impl<T: TimelineComponent, Interp: InterpFunc<T::Item>>
 {
     /// Register this component timeline **without** reflection.
     ///
-    /// To use reflection, run [`Self::reflect`] first.
+    /// To use reflection, run [`RegisterTimeline::reflect`] first.
+    ///
+    /// # Panics
+    /// Panics if this was already done for this timeline.
+    ///
+    /// For a version that errors instead, use [`Self::try_register_component`].
+    #[inline]
+    #[track_caller]
     pub fn register_component(self) {
-        /// Do common stuff for adding a component. Returns `true` if done, and `false` if this was already
-        /// done for this timeline and component already.
-        fn register_component_common<T: TimelineComponent>(
+        if let Err(AlreadyRegisteredError) = self.try_register_component() {
+            panic!("{}", AlreadyRegisteredError);
+        }
+    }
+
+    /// Try to register this component timeline **without** reflection.
+    ///
+    /// To use reflection, run [`RegisterTimeline::reflect`] first.
+    ///
+    /// # Errors
+    /// Errors if this was already done for this timeline.
+    pub fn try_register_component(self) -> Result<(), AlreadyRegisteredError> {
+        /// Try to do common stuff for adding a component.
+        ///
+        /// # Errors
+        /// Errors if this was already done for this timeline.
+        // TODO: inline this lol
+        fn try_register_component_common<T: TimelineComponent>(
             continuum_instance: T::Continuum,
             world: &mut World,
-        ) -> bool {
+        ) -> Result<(), AlreadyRegisteredError> {
             let mut schedules = world.get_resource_or_init::<Schedules>();
             let rot_buf_sched = schedules.entry(TimeTravelSchedules::RotatingBuffers(
                 continuum_instance.clone(),
@@ -200,7 +262,7 @@ impl<T: TimelineComponent, Interp: InterpFunc<T::Item>>
                 rot_buf_sched,
                 component_rotate_buffers::<T>.system_type_id(),
             ) {
-                return false;
+                return Err(AlreadyRegisteredError);
             }
 
             // We're all good, go forward.
@@ -258,13 +320,11 @@ impl<T: TimelineComponent, Interp: InterpFunc<T::Item>>
                     .add_systems(clean_up_disabled::<T>.in_set(TimeTravelSystemSet));
             }
 
-            true
+            Ok(())
         }
 
         let continuum_instance = T::Continuum::default();
-        if !register_component_common::<T>(continuum_instance.clone(), self.world) {
-            return;
-        }
+        try_register_component_common::<T>(continuum_instance.clone(), self.world)?;
 
         let interp_func = component_interpolate_to_instantiator::<T>(self.interp_func);
 
@@ -272,6 +332,8 @@ impl<T: TimelineComponent, Interp: InterpFunc<T::Item>>
             .get_resource_or_init::<Schedules>()
             .entry(TimeTravelSchedules::Interpolating(continuum_instance))
             .add_systems(interp_func.in_set(TimeTravelSystemSet));
+
+        Ok(())
     }
 }
 
@@ -280,7 +342,24 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>, Reflect: Fn(&mut World)>
     RegisterTimeline<'_, T, Interp, Reflect>
 {
     /// Register this resource timeline with reflection.
+    ///
+    /// # Panics
+    /// Panics if this was already done for this timeline.
+    ///
+    /// For a version that errors instead, use [`Self::try_register_resource`].
+    #[inline]
+    #[track_caller]
     pub fn register_resource(self) {
+        if let Err(AlreadyRegisteredError) = self.try_register_resource() {
+            panic!("{}", AlreadyRegisteredError);
+        }
+    }
+
+    /// Try to register this resource timeline with reflection.
+    ///
+    /// # Errors
+    /// Errors if this was already done for this timeline.
+    pub fn try_register_resource(self) -> Result<(), AlreadyRegisteredError> {
         (self.reflect_func)(self.world);
 
         let noreflect = RegisterTimeline {
@@ -290,7 +369,7 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>, Reflect: Fn(&mut World)>
             reflect_func: Unspecified,
         };
 
-        noreflect.register_resource();
+        noreflect.try_register_resource()
     }
 }
 
@@ -299,14 +378,36 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
 {
     /// Register this resource timeline **without** reflection.
     ///
-    /// To use reflection, run [`Self::reflect`] first.
+    /// To use reflection, run [`RegisterTimeline::reflect`] first.
+    ///
+    /// # Panics
+    /// Panics if this was already done for this timeline.
+    ///
+    /// For a version that errors instead, use [`Self::try_register_resource`].
+    #[inline]
+    #[track_caller]
     pub fn register_resource(self) {
-        /// Do common stuff for adding a resource. Returns `true` if done, and `false` if this was already
-        /// done for this timeline and resource already.
+        if let Err(AlreadyRegisteredError) = self.try_register_resource() {
+            panic!("{}", AlreadyRegisteredError);
+        }
+    }
+
+    /// Try to register this resource timeline **without** reflection.
+    ///
+    /// To use reflection, run [`Self::reflect`] first.
+    ///
+    /// # Errors
+    /// Errors if this was already done for this timeline.
+    pub fn try_register_resource(self) -> Result<(), AlreadyRegisteredError> {
+        /// Try to do common stuff for adding a resource.
+        ///
+        /// # Errors
+        /// Errors if this was already done for this timeline.
+        // TODO: inline this lol
         fn register_resource_common<T: TimelineResource>(
             continuum_instance: T::Continuum,
             world: &mut World,
-        ) -> bool {
+        ) -> Result<(), AlreadyRegisteredError> {
             let mut schedules = world.get_resource_or_init::<Schedules>();
             let rot_buf_sched = schedules.entry(TimeTravelSchedules::RotatingBuffers(
                 continuum_instance.clone(),
@@ -314,7 +415,7 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
 
             // We want to check if we did this before with this timeline.
             if has_system(rot_buf_sched, resource_rotate_buffers::<T>.system_type_id()) {
-                return false;
+                return Err(AlreadyRegisteredError);
             }
 
             // We're all good, go forward.
@@ -354,13 +455,11 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
                 ))
                 .add_systems(resource_clean_up_perform::<T>.in_set(TimeTravelSystemSet));
 
-            true
+            Ok(())
         }
 
         let continuum_instance = T::Continuum::default();
-        if !register_resource_common::<T>(continuum_instance.clone(), self.world) {
-            return;
-        }
+        register_resource_common::<T>(continuum_instance.clone(), self.world)?;
 
         let interp_func = resource_interpolate_to_instantiator::<T>(self.interp_func);
 
@@ -368,5 +467,7 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
             .get_resource_or_init::<Schedules>()
             .entry(TimeTravelSchedules::Interpolating(continuum_instance))
             .add_systems(interp_func.in_set(TimeTravelSystemSet));
+
+        Ok(())
     }
 }
