@@ -11,6 +11,26 @@ use super::timekeep::{ContinuumTime, Timekeep};
 #[cfg(feature = "logging")]
 use bevy_log::prelude::*;
 
+
+// TODO: for better clarity, make there be a singular method on `World` for accessing a continuum,
+// and then make all this methods on that.
+//
+// because these methods can be quite ambiguous for someone not immediately recognizing that they
+// belong to this crate
+//
+// So, instead of:
+//
+// world.rewind_to::<SomeContinuum>(dur);
+//
+// it'd be:
+//
+// world.continuum::<SomeContinuum>().rewind_to(dur);
+//
+// perhaps do this when moving the crate to the next bevy version, so that in case someone actually
+// depends on this, they would have a better mindset for this change since they'd be fixing stuff up
+// after a migration anyway lol
+//
+
 /// Methods to quickly manage world state. Implemented on [`World`].
 pub trait WorldTimeTravel {
     /// Create a builder for registering a timeline.
