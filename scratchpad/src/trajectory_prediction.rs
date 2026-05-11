@@ -46,12 +46,6 @@ pub struct PredictionPlugin;
 
 impl Plugin for PredictionPlugin {
     fn build(&self, app: &mut App) {
-        app.world_mut()
-            .register_timeline::<Predicted<Transform>>()
-            .without_interpolation()
-            .reflect()
-            .register_component();
-
         app.add_systems(Update, (do_predictions, draw_predictions).chain());
         app.world_mut()
             .insert_resource(StoredPredictions::default());
