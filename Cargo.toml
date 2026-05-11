@@ -4,7 +4,6 @@ resolver = "3"
 members = [
 	"scratchpad",
 	"bevy_mod_time_travel",
-	"ensure_no_std",
 ]
 
 # optimize dependencies
