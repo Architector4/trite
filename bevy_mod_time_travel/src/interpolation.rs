@@ -181,20 +181,20 @@ impl Plugin for InterpolationPlugin {
             .world_mut()
             .resource_mut::<FixedMainScheduleOrder>()
             .labels;
-        fmso.insert(0, PreReturnToFixedSchedule.intern());
-        fmso.push(PostReturnToFixedSchedule.intern());
+        fmso.insert(0, PreFixedLogic.intern());
+        fmso.push(PostFixedLogic.intern());
 
         // First custom schedule runs one system that returns everything to the last recorded state
         // from fixed timesteps, returning world state to as if there is no interpolation. There's
         // logic in there that prevents it from running multiple times per frame, in case there's
         // multiple steps to go through.
-        app.add_systems(PreReturnToFixedSchedule, return_to_fixed);
+        app.add_systems(PreFixedLogic, return_to_fixed);
 
         // After it, normal fixed main schedules and systems run and do their thing.
 
         // After that, a system in the second custom schedule rotates buffers, recording new state
         // and dropping old.
-        app.add_systems(PostReturnToFixedSchedule, record_new_state);
+        app.add_systems(PostFixedLogic, record_new_state);
 
         // After fixed main loop, which runs every frame unconditionally and does 0 or more steps,
         // this system is run. It performs the actual interpolation.
@@ -227,13 +227,24 @@ impl Plugin for InterpolationPlugin {
     }
 }
 
+/// Custom schedule for interpolation that runs just before [`FixedFirst`]. Contains just the
+/// [`return_to_fixed`] system.
+///
+/// [`FixedFirst`]: bevy_app::FixedFirst
 #[derive(Clone, PartialEq, Eq, Debug, Hash, ScheduleLabel)]
-struct PreReturnToFixedSchedule;
+pub struct PreFixedLogic;
+
+/// Custom schedule for interpolation that runs just after [`FixedLast`]. Contains just the
+/// [`record_new_state`] system.
+///
+/// [`FixedLast`]: bevy_app::FixedLast
 #[derive(Clone, PartialEq, Eq, Debug, Hash, ScheduleLabel)]
-struct PostReturnToFixedSchedule;
+pub struct PostFixedLogic;
 
 /// A system that returns state of the world to last state recorded by [`record_new_state`], if
 /// any. This should run before fixed timestep logic to avoid exposing interpolated values to it.
+///
+/// Normally this system should be in the [`PreFixedLogic`] schedule.
 ///
 /// # Panics
 ///
@@ -292,6 +303,8 @@ pub fn return_to_fixed(world: &mut World) {
 
 /// A system that records new world state. This should run after every finished fixed timestep tick
 /// to record data that we can interpolate with.
+///
+/// Normally this system should be in the [`PostFixedLogic`] schedule.
 ///
 /// # Panics
 ///
