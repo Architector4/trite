@@ -127,9 +127,8 @@ pub trait WorldTimeTravel {
     /// Delete all recorded state.
     fn clear_timelines<C: Continuum>(&mut self);
 
-    // TODO: read this garbage thoroughly and maybe rewrite it and maybe mention that this has
-    // nothing to do with tick restore policy
-    /// Detect changes made to tracked world state and account for them in a simple way.
+    /// Detect changes made to world state tracked by this continuum and account for them in a
+    /// simple way.
     ///
     /// If any resource or entity's component is changed since the last time this method or
     /// [`Self::discard_changes`] is run, the last `overwrite_states` recorded states in the
@@ -143,10 +142,10 @@ pub trait WorldTimeTravel {
     /// controlled simulation by ensuring it continues from the new state onward, if at least *one*
     /// last state is overwritten.
     ///
-    /// For example, consider linear interpolation as implemented in this crate. Just before fixed
-    /// timestep logic is run, world state is overwritten with the last moment recorded within the
-    /// buffers. Then, just after it's run, new world state is saved. Afterward, on every frame,
-    /// current world state is overwritten with interpolated results from last two saved states.
+    /// For example, consider [`InterpolationPlugin`] in this crate. Just before fixed timestep
+    /// logic is run, world state is overwritten with the last moment recorded within the buffers.
+    /// Then, just after it's run, new world state is saved. Afterward, on every frame, current
+    /// world state is overwritten with interpolated results from last two saved states.
     ///
     /// Nowhere in this process are state changes made from *outside* the fixed timestep logic is
     /// read. What this means is that changes made in an [`Update`] schedule, or anywhere else,
@@ -163,8 +162,8 @@ pub trait WorldTimeTravel {
     ///
     /// There's a caveat in the above case: because both states are used for interpolation, the
     /// object will appear to freeze up in this new state up until the next fixed timestep happens
-    /// and new state is recorded and interpolated to. Nonetheless, it might be of use for
-    /// diagnostic use cases.
+    /// and new state is recorded and interpolated to. Nonetheless, it might come in handy in
+    /// diagnostic uses cases like this.
     ///
     /// # Rollback use
     ///
