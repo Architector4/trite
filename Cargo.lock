@@ -2718,13 +2718,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ensure_no_std"
-version = "0.1.0"
-dependencies = [
- "bevy_mod_time_travel",
-]
-
-[[package]]
 name = "epaint"
 version = "0.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
