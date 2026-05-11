@@ -15,6 +15,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+# yoinked from here: https://docs.github.com/en/actions/tutorials/build-and-test-code/rust#caching-dependencies
+    - name: Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    
     - name: Install build dependencies
       run: sudo apt-get update; sudo apt-get install --no-install-recommends libasound2-dev libudev-dev libwayland-dev
     - name: Run clippy
