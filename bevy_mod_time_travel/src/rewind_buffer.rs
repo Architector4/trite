@@ -743,7 +743,7 @@ mod tests {
             panic!("previous and exact epic fail");
         }
 
-        let Err(OutOfRecordedRangeError) = std::dbg!(buf.find_for_interpolation(secs(0))) else {
+        let Err(OutOfRecordedRangeError) = buf.find_for_interpolation(secs(0)) else {
             panic!("out of range epic fail");
         };
 

@@ -95,16 +95,20 @@ let ent = world
     .id();
 
 // Store the current state into the timelines.
-world.insert_into_buffers::<MyContinuum>(Duration::ZERO);
+world.continuum::<MyContinuum>().insert_into_buffers(Duration::ZERO);
 
 // Edit the current state.
 world.entity_mut(ent).get_components_mut::<&mut Transform>().unwrap().translation.z = 1.0;
 
+// When you're about to do multiple things on a continuum, for brevity,
+// it can be a good idea to grab the interface into a separate variable first.
+let mut cont = world.continuum::<MyContinuum>();
+
 // Store the new one too.
-world.insert_into_buffers::<MyContinuum>(Duration::from_secs(1));
+cont.insert_into_buffers(Duration::from_secs(1));
 
 // Interpolate between the two states.
-world.interpolate_to::<MyContinuum>(Duration::from_millis(500)).unwrap();
+cont.interpolate_to(Duration::from_millis(500)).unwrap();
 
 let new_transform = world.entity(ent).get_components::<&Transform>().unwrap();
 // Waow! It interpolate!

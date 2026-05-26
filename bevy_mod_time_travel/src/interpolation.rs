@@ -285,13 +285,16 @@ pub fn return_to_fixed(world: &mut World) {
     };
 
     let policy = variables.rewind_policy;
+    let account_for_changes = variables.account_for_changes;
 
-    if variables.account_for_changes {
+    let mut continuum = world.continuum::<InterpolatedContinuum>();
+
+    if account_for_changes {
         // Overwrite last 1 state where it changed.
-        world.account_for_changes::<InterpolatedContinuum>(1);
+        continuum.account_for_changes(1);
     }
 
-    if let Ok(resulting_time) = world.rewind_to_with_policies::<InterpolatedContinuum>(
+    if let Ok(resulting_time) = continuum.rewind_to_with_policies(
         target_time,
         policy,
         // If the buffer wasn't populated yet, we don't want to delete anything.
@@ -331,15 +334,16 @@ pub fn record_new_state(world: &mut World) {
         "Timestep should never be zero."
     );
 
-    if variables.account_for_changes {
+    let account_for_changes = variables.account_for_changes;
+
+    let mut continuum = world.continuum::<InterpolatedContinuum>();
+
+    if account_for_changes {
         // Discard changes made in this tick.
-        world.discard_changes::<InterpolatedContinuum>();
+        continuum.discard_changes();
     }
 
-    world.rotate_buffers::<InterpolatedContinuum>(
-        elapsed.saturating_sub(timestep + extra_backlog),
-        elapsed,
-    );
+    continuum.rotate_buffers(elapsed.saturating_sub(timestep + extra_backlog), elapsed);
 }
 
 /// A system that performs interpolation. This should be run every frame after fixed timestep logic
@@ -365,7 +369,9 @@ pub fn perform_interpolation(world: &mut World) {
         .saturating_sub(fixed.timestep());
 
     if variables.account_for_changes {
-        world.account_for_changes::<InterpolatedContinuum>(2);
+        world
+            .continuum::<InterpolatedContinuum>()
+            .account_for_changes(2);
     }
 
     if let Some(continuum_time) = world.get_resource::<ContinuumTime<InterpolatedContinuum>>()
@@ -375,11 +381,14 @@ pub fn perform_interpolation(world: &mut World) {
         // No need lol
     } else {
         #[allow(unused_variables)]
-        if let Ok(resulting_time) = world.interpolate_to_with_policy::<InterpolatedContinuum>(
-            target_time,
-            // If the buffer wasn't populated yet, we don't want to delete anything.
-            OutOfTimelineRangePolicy::DoNothing,
-        ) {
+        if let Ok(resulting_time) = world
+            .continuum::<InterpolatedContinuum>()
+            .interpolate_to_with_policy(
+                target_time,
+                // If the buffer wasn't populated yet, we don't want to delete anything.
+                OutOfTimelineRangePolicy::DoNothing,
+            )
+        {
             // Generally speaking, resulting_time and target_time should be roughly the same.
             // This can wildly change if the timestep value is changed suddenly.
             // As such, the below assert does not work out well.
@@ -390,7 +399,7 @@ pub fn perform_interpolation(world: &mut World) {
     }
 
     if variables.account_for_changes {
-        world.discard_changes::<InterpolatedContinuum>();
+        world.continuum::<InterpolatedContinuum>().discard_changes();
     }
 }
 
@@ -441,7 +450,7 @@ impl<T: Clone + Send + Sync + 'static> DerefMut for Interpolated<T> {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default, ScheduleLabel)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-/// A [`Continuum`] for [`Interpolated<T>`].
+/// A [`Continuum`] for [`Interpolated<T>`] timelines.
 pub struct InterpolatedContinuum;
 impl Continuum for InterpolatedContinuum {}
 

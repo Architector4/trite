@@ -91,11 +91,13 @@ fn do_predictions(world: &mut World, mut last_run_at: Local<Option<Duration>>) {
 
     *last_run_at = last_time;
 
-    let _ = world.rewind_to_with_policies::<InterpolatedContinuum>(
-        original_time.elapsed(),
-        TickRestorePolicy::RestoreOldTicks,
-        OutOfTimelineRangePolicy::default(),
-    );
+    let _ = world
+        .continuum::<InterpolatedContinuum>()
+        .rewind_to_with_policies(
+            original_time.elapsed(),
+            TickRestorePolicy::RestoreOldTicks,
+            OutOfTimelineRangePolicy::default(),
+        );
     //
 
     // Skip interpolation for the stuff below.
@@ -104,7 +106,9 @@ fn do_predictions(world: &mut World, mut last_run_at: Local<Option<Duration>>) {
     }
 
     // Save current state.
-    world.insert_into_buffers::<PredictedContinuum>(original_time.elapsed());
+    world
+        .continuum::<PredictedContinuum>()
+        .insert_into_buffers(original_time.elapsed());
 
     // Clear the store of predictions too.
     world.resource_mut::<StoredPredictions>().0.clear();
@@ -137,7 +141,9 @@ fn do_predictions(world: &mut World, mut last_run_at: Local<Option<Duration>>) {
 
         // Record new state. This accumulates with no limit, but cleanup code below runs
         // `delete_after` and eventually `clear_continuum`.
-        world.insert_into_buffers::<PredictedContinuum>(new_elapsed);
+        world
+            .continuum::<PredictedContinuum>()
+            .insert_into_buffers(new_elapsed);
         // Mark everything as changed. This is done every "real" tick due to the same policy used
         // in the interpolation plugin with this crate's setup, so do it here to ensure symmetry.
         //world
@@ -152,7 +158,8 @@ fn do_predictions(world: &mut World, mut last_run_at: Local<Option<Duration>>) {
     // We're done. Restore original state.
     world.remove_resource::<NowPredicting>();
     world
-        .rewind_to_with_policies::<PredictedContinuum>(
+        .continuum::<PredictedContinuum>()
+        .rewind_to_with_policies(
             original_time.elapsed(),
             TickRestorePolicy::MarkAllChanged,
             OutOfTimelineRangePolicy::default(),
@@ -167,14 +174,16 @@ fn do_predictions(world: &mut World, mut last_run_at: Local<Option<Duration>>) {
         .expect("System to store predictions should not be broken");
 
     // Final cleanup.
-    world.clear_timelines::<PredictedContinuum>();
+    world.continuum::<PredictedContinuum>().clear_timelines();
     world.insert_resource(original_input);
     //world.insert_resource(original_input_messages);
     if let Some(mut vars) = world.get_resource_mut::<InterpolationVariables>() {
         vars.run_interpolation_systems = true;
     }
     if let Some(last_interpolated_to) = last_interpolated_to {
-        let _ = world.interpolate_to::<InterpolatedContinuum>(last_interpolated_to);
+        let _ = world
+            .continuum::<InterpolatedContinuum>()
+            .interpolate_to(last_interpolated_to);
     }
 }
 

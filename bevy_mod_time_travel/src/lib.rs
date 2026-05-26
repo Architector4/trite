@@ -8,6 +8,9 @@ extern crate std;
 
 extern crate alloc;
 
+// Modules are arranged intentionally here; ones later are built on ones earlier.
+// `continuum` needs `rewind_buffer`, `schedules` needs `continuum`, etc.
+
 /// Module for [`Moment<T>`] and [`RewindBuffer<T>`]. The core of the crate.
 ///
 /// [`Moment<T>`]: rewind_buffer::Moment<T>
@@ -36,18 +39,27 @@ pub mod continuum;
 /// [`RegisterTimeline`]: registration::RegisterTimeline
 pub mod schedules;
 
+/// Resources that keep help keep track of the current time and stored moments within timelines.
+/// Managed by functions in [`world_methods`] module.
+pub mod timekeep;
+
 /// Module for [`RegisterTimeline`], a way to register timelines into the world.
 ///
 /// [`RegisterTimeline`]: registration::RegisterTimeline
 pub mod registration;
 
-/// Resources that keep help keep track of the current time and stored moments within timelines.
-/// Managed by functions in [`world_methods`] module.
-pub mod timekeep;
+/// Module for [`WorldContinuumInterface`], a way to alter the world state based on a continuum.
+///
+/// [`WorldContinuumInterface`]: world_continuum_interface::WorldContinuumInterface
+pub mod world_continuum_interface;
 
-/// Methods that run the timeline schedules and [`timekeep`]ing in a convenient manner.
+/// Module for [`WorldTimeTravel`], a trait with methods to register timelines and manipulate
+/// continuums.
+///
+/// [`WorldTimeTravel`]: world_methods::WorldTimeTravel
 pub mod world_methods;
 
+// (the doc for this one is big and belongs in the module itself lol)
 #[cfg(feature = "interpolation")]
 pub mod interpolation;
 
@@ -93,4 +105,5 @@ pub mod prelude {
     pub use super::schedules::{OutOfTimelineRangePolicy, TickRestorePolicy};
     pub use super::world_methods::WorldTimeTravel;
     pub use core::time::Duration;
+    pub use bevy_ecs::schedule::ScheduleLabel;
 }

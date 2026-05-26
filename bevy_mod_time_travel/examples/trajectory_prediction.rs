@@ -480,7 +480,7 @@ mod prediction {
         //let last_interpolated_to = world
         //    .get_resource::<ContinuumTime<InterpolatedContinuum>>()
         //    .map(|x| x.time);
-        //world.rewind_to::<InterpolatedContinuum>(original_time.elapsed());
+        //world.continuum::<InterpolatedContinuum>().rewind_to(original_time.elapsed());
         //
         // Note: if you restore the code above, you should also put a Local<Duration> parameter to
         // this system and compare it against original_time.elapsed() and return early if equal,
@@ -493,7 +493,9 @@ mod prediction {
             .run_interpolation_systems = false;
 
         // Save current state.
-        world.insert_into_buffers::<PredictedContinuum>(original_time.elapsed());
+        world
+            .continuum::<PredictedContinuum>()
+            .insert_into_buffers(original_time.elapsed());
 
         // Clear the store of predictions too.
         world.resource_mut::<StoredPredictions>().0.clear();
@@ -544,7 +546,9 @@ mod prediction {
 
                 // Record new state. This accumulates with no limit, but cleanup code below runs
                 // `delete_after` and eventually `clear_timeline`.
-                world.insert_into_buffers::<PredictedContinuum>(new_elapsed);
+                world
+                    .continuum::<PredictedContinuum>()
+                    .insert_into_buffers(new_elapsed);
 
                 // Did rocket crash?
                 let crashed = world
@@ -561,7 +565,8 @@ mod prediction {
             // We don't need to care about restoring change detection here anyway because it would
             // get reset by interpolation anyway.
             world
-                .rewind_to_with_policies::<PredictedContinuum>(
+                .continuum::<PredictedContinuum>()
+                .rewind_to_with_policies(
                     original_time.elapsed(),
                     TickRestorePolicy::Bypass,
                     OutOfTimelineRangePolicy::default(),
@@ -576,11 +581,13 @@ mod prediction {
                 .expect("System to store predictions should not be broken");
 
             // Now get rid of it.
-            world.delete_after::<PredictedContinuum>(original_time.elapsed());
+            world
+                .continuum::<PredictedContinuum>()
+                .delete_after(original_time.elapsed());
         }
 
         // Final cleanup.
-        world.clear_timelines::<PredictedContinuum>();
+        world.continuum::<PredictedContinuum>().clear_timelines();
         world.insert_resource(original_input);
         world
             .resource_mut::<InterpolationVariables>()
@@ -589,7 +596,7 @@ mod prediction {
         // block somewhere above.
         //
         //if let Some(last_interpolated_to) = last_interpolated_to {
-        //    world.interpolate_to::<InterpolatedContinuum>(last_interpolated_to);
+        //    world.continuum::<InterpolatedContinuum>().interpolate_to(last_interpolated_to);
         //}
     }
 
