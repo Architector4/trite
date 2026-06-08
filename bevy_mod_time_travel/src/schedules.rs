@@ -414,7 +414,7 @@ pub fn component_rotate_buffers<T: TimelineComponent>(
         let moment = Moment {
             time: rotate_buffers.current_time,
             snap_to: buf.discontinuity(),
-            item: item.map(|x| (ChangeDetectionState::from(&x), x.clone())),
+            item: item.map(|x| (ChangeDetectionState::from(&x), (*x).clone())),
         };
 
         buf.reset_discontinuity();

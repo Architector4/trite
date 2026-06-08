@@ -68,6 +68,12 @@ impl<T: Timeline<Item: Component<Mutability = Mutable>> + Component<Mutability =
 }
 
 /// Convenience auto-impl trait representing [Timeline] for a Bevy [Resource].
-pub trait TimelineResource: Timeline<Item: Resource> + Resource {}
+pub trait TimelineResource:
+    Timeline<Item: Resource<Mutability = Mutable>> + Resource<Mutability = Mutable>
+{
+}
 
-impl<T: Timeline<Item: Resource> + Resource> TimelineResource for T {}
+impl<T: Timeline<Item: Resource<Mutability = Mutable>> + Resource<Mutability = Mutable>>
+    TimelineResource for T
+{
+}

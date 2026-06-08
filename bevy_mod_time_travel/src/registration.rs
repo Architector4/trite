@@ -164,13 +164,13 @@ impl<
 fn has_system(sched: &Schedule, system_id: TypeId) -> bool {
     if let Ok(systems) = sched.systems() {
         for s in systems {
-            if s.1.type_id() == system_id {
+            if s.1.system_type() == system_id {
                 return true;
             }
         }
     } else {
         for s in sched.graph().systems.iter() {
-            if s.1.type_id() == system_id {
+            if s.1.system_type() == system_id {
                 return true;
             }
         }
@@ -442,7 +442,8 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
                 .add_systems(
                     resource_account_for_changes_if_changed::<T>
                         .run_if(
-                            resource_added::<T::Item>.or(resource_changed_or_removed::<T::Item>),
+                            resource_added::<T::Item>
+                                .or_eager(resource_changed_or_removed::<T::Item>),
                         )
                         .in_set(TimeTravelSystemSet),
                 );

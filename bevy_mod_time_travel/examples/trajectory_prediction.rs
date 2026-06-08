@@ -53,7 +53,7 @@ struct Explosion {
 struct PredictableGameplayLogic;
 
 fn run_predictable_gameplay_logic(world: &mut World) {
-    world.run_schedule(PredictableGameplayLogic)
+    world.run_schedule(PredictableGameplayLogic);
 }
 
 fn main() {
@@ -365,7 +365,7 @@ fn explosion_animate(
         }
         transform.scale = Vec3::ONE * explosion.progress;
 
-        let material = materials
+        let mut material = materials
             .get_mut(&material.0)
             .expect("Material should be present");
         material.color.set_alpha((1.0 - explosion.progress).powi(2));

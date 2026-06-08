@@ -472,4 +472,4 @@ impl<T: Component<Mutability = Mutable> + Clone> Component for Interpolated<T> {
     type Mutability = Mutable;
 }
 
-impl<T: Resource + Clone> Resource for Interpolated<T> {}
+impl<T: Resource<Mutability = Mutable> + Clone> Resource for Interpolated<T> {}

@@ -13,28 +13,28 @@ categories = ["game-development"]
 [dependencies]
 
 # Mandatory, obviously.
-bevy_ecs = { version = "0.18.0", default-features = false }
+bevy_ecs = { version = "0.19.0-rc.2", default-features = false }
 
 # For when not using std feature; unused otherwise.
 # Note: bevy_ecs depends on bevy_platform which enables spin features "mutex" and "spin_mutex" unconditionally.
 spin = { version = "0.10.0", default-features = false }
 
 # For interpolation feature.
-bevy_time = { version = "0.18.0", default-features = false, optional = true }
-bevy_app = { version = "0.18.0", default-features = false, optional = true }
+bevy_time = { version = "0.19.0-rc.2", default-features = false, optional = true }
+bevy_app = { version = "0.19.0-rc.2", default-features = false, optional = true }
 
 # For interpolation_for_transform feature.
-bevy_transform = { version = "0.18.0", default-features = false, features = ["bevy-support"], optional = true }
+bevy_transform = { version = "0.19.0-rc.2", default-features = false, features = ["bevy-support"], optional = true }
 
 # For bevy_animation feature.
 # Note: bevy_animation uses std and bevy_reflect unconditionally.
-bevy_animation = { version = "0.18.0", default-features = false, optional = true }
+bevy_animation = { version = "0.19.0-rc.2", default-features = false, optional = true }
 
 # For bevy_reflect feature.
-bevy_reflect = { version = "0.18.0", default-features = false, optional = true }
+bevy_reflect = { version = "0.19.0-rc.2", default-features = false, optional = true }
 
 # For logging feature.
-bevy_log = { version = "0.18.0", optional = true }
+bevy_log = { version = "0.19.0-rc.2", optional = true }
 
 
 [features]
@@ -66,7 +66,7 @@ bevy_transform-libm = ["bevy_transform?/libm"]
 
 [dev-dependencies]
 # Just for the examples.
-bevy = "0.18.0"
+bevy = "0.19.0-rc.2"
 
 
 # For this tool:

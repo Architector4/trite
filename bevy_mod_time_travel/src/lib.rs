@@ -104,6 +104,6 @@ pub mod prelude {
     pub use super::rewind_buffer::{Moment, RewindBuffer};
     pub use super::schedules::{OutOfTimelineRangePolicy, TickRestorePolicy};
     pub use super::world_methods::WorldTimeTravel;
-    pub use core::time::Duration;
     pub use bevy_ecs::schedule::ScheduleLabel;
+    pub use core::time::Duration;
 }
