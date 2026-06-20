@@ -1,6 +1,9 @@
 use core::{any::TypeId, marker::PhantomData};
 
 use bevy_ecs::{
+    lifecycle::Add,
+    observer::On,
+    resource::IsResource,
     schedule::{
         IntoScheduleConfigs, Schedule, Schedules, SystemCondition,
         common_conditions::{resource_added, resource_changed_or_removed},
@@ -455,6 +458,23 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
                     continuum_instance,
                 ))
                 .add_systems(resource_clean_up_perform::<T>.in_set(TimeTravelSystemSet));
+
+            // One last thing! This will allow using the same generic timeline type as a component
+            // and as resource, depending on if the `T::Item` is a component or a resource.
+
+            world.register_component::<T>();
+
+            let component_id = world
+                .component_id::<T>()
+                .expect("Component was literally just registered a second ago");
+
+            world.add_observer(
+                move |data: On<Add, T>, mut commands: bevy_ecs::system::Commands| {
+                    commands
+                        .entity(data.entity)
+                        .insert_if_new(IsResource::new(component_id));
+                },
+            );
 
             Ok(())
         }
