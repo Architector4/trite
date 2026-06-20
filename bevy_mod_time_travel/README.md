@@ -17,14 +17,14 @@ use the rest of the crate. See module `interpolation` for details.
 - Tracking, rewinding, and interpolating multiple coexisting continuums of world state separately.
 - Tracking, rewinding, and interpolating any arbitrary components and resources.
 - Best-effort preservation of change detection state when rewinding, or options for otherwise.
-- A method for tracking change in relation to the timeline.
+- A method for detecting change in the world state tracked by a continuum.
 - Quick and easy API to "time travel" a world across a continuum once you're set up.
 
 # Here you don't get:
 
 These things the crate currently does **not** do, but might in some future:
 - API for tracking/rewinding/interpolating only specific entities and resources. These can be
-  grouped into separate continuums instead if needed
+  grouped into separate continuums instead if needed.
 - Automatically inserting time travel systems per timeline (i.e. per component/resource). For this,
   use `WorldTimeTravel::register_timeline` on the relevant timeline.
 - Any interaction with `Local` parameters of systems, including message reader cursors. Because of
@@ -41,8 +41,9 @@ These things the crate currently does **not** do, but might in some future:
 
 # "Pick B" behavior
 
-In some cases, continuous interpolation between two states is not possible, for example if one of
-them is an absent component but the other is present.
+In some cases, continuous interpolation between two states is not possible. For example, it's
+possible that such interpolation has to be performed between a state representing an absence of a
+component, and one that represents its presence.
 
 For cases like this, this crate chooses to **pick B**, i.e. the latter state, regardless of if the
 interpolation factor is closer to one or the other.
@@ -54,7 +55,7 @@ tracks, which also happens to match up with the latest available state of the wo
 other behavior could cause a lot of unnecessary creations/deletions of components, as well as less
 predictable behavior.
 
-# Example
+# Crate usage example
 
 ```rust
 use bevy::ecs::schedule::ScheduleLabel;
@@ -97,10 +98,11 @@ impl<T: Clone + Send + Sync + 'static> Timeline for MyTimeline<T> {
     type Continuum = MyContinuum;
 }
 
-// Example resource. Their API is slightly different in this crate.
+// Example resource. The API for them is slightly different in this crate compared to components.
 #[derive(Resource, Clone, Default)]
 struct SomeResource(f32);
 
+// Let's go on a bizzare adventure.
 let mut world = World::new();
 
 // Register the timelines into the world. This creates the correct schedules and systems that will
@@ -167,9 +169,9 @@ assert_eq!(new_resource.0, 0.5);
 ```
 
 
-## Crate features
+## Feature flags
 
-All features are enabled by default except `bevy_transform-libm`:
+All feature flags are enabled by default except `bevy_transform-libm`:
 
 - `bevy_animation` - enables a convenience method for using
   `bevy_animation::Animatable::interpolate` as the interpolation function when registering a
