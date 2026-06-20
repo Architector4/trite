@@ -17,7 +17,7 @@ use bevy_mod_time_travel::timekeep::ContinuumTime;
 // NOTE: mostly copied over from the trajectory_prediction example and beat into shape lmao
 
 // Define the continuum...
-#[derive(Clone, Debug, Deref, DerefMut, Reflect, Default, Component, Resource)]
+#[derive(Clone, Debug, Deref, DerefMut, Reflect, Default, Component)]
 pub struct Predicted<T: Clone + Send + Sync + 'static> {
     pub buf: RewindBuffer<T>,
 }
