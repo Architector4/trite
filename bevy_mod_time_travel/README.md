@@ -81,8 +81,8 @@ impl<T: Component<Mutability = Mutable> + Clone> Component for MyTimeline<T> {
 // https://github.com/bevyengine/bevy/issues/24686
 // 
 // This crate performs a workaround that makes this type act exactly like a proper resource when
-// needed. The workaround lives in the function that registers the type as a resource timeline; see
-// a bit below.
+// needed, so feel free to define your resource timelines in this way. The workaround lives in the
+// function that registers the type as a resource timeline; see a bit below.
 impl<T: Resource<Mutability = Mutable> + Clone> Resource for MyTimeline<T> {}
 
 // Continuum type to group all instances of the generic timeline together.
