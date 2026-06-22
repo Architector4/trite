@@ -208,7 +208,7 @@ fn setup(
 
     commands.spawn((
         DirectionalLight {
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             illuminance: 3000.0,
             shadow_depth_bias: 0.002,
             ..default()
