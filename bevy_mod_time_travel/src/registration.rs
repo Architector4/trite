@@ -461,6 +461,7 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
 
             // One last thing! This will allow using the same generic timeline type as a component
             // and as resource, depending on if the `T::Item` is a component or a resource.
+            // TODO: mention this anywhere in docs other than readme
 
             world.register_component::<T>();
 
