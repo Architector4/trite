@@ -56,7 +56,7 @@ pub trait Timeline:
 /// [`ScheduleLabel`]: bevy_ecs::schedule::ScheduleLabel
 pub trait Continuum: ScheduleLabel + Default + Clone + Eq + Hash {}
 
-/// Convenience auto-impl trait representing [Timeline] for a Bevy [Component].
+/// Convenience auto-impl trait representing [`Timeline`] for a Bevy [`Component`].
 pub trait TimelineComponent:
     Timeline<Item: Component<Mutability = Mutable>> + Component<Mutability = Mutable>
 {
@@ -67,7 +67,7 @@ impl<T: Timeline<Item: Component<Mutability = Mutable>> + Component<Mutability =
 {
 }
 
-/// Convenience auto-impl trait representing [Timeline] for a Bevy [Resource].
+/// Convenience auto-impl trait representing [`Timeline`] for a Bevy [`Resource`].
 pub trait TimelineResource:
     Timeline<Item: Resource<Mutability = Mutable>> + Resource<Mutability = Mutable>
 {

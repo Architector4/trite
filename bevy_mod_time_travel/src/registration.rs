@@ -1,9 +1,6 @@
 use core::{any::TypeId, marker::PhantomData};
 
 use bevy_ecs::{
-    lifecycle::Add,
-    observer::On,
-    resource::IsResource,
     schedule::{
         IntoScheduleConfigs, Schedule, Schedules, SystemCondition,
         common_conditions::{resource_added, resource_changed_or_removed},
@@ -459,23 +456,40 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
                 ))
                 .add_systems(resource_clean_up_perform::<T>.in_set(TimeTravelSystemSet));
 
-            // One last thing! This will allow using the same generic timeline type as a component
-            // and as resource, depending on if the `T::Item` is a component or a resource.
-            // TODO: mention this anywhere in docs other than readme
-
-            world.register_component::<T>();
-
-            let component_id = world
-                .component_id::<T>()
-                .expect("Component was literally just registered a second ago");
-
-            world.add_observer(
-                move |data: On<Add, T>, mut commands: bevy_ecs::system::Commands| {
-                    commands
-                        .entity(data.entity)
-                        .insert_if_new(IsResource::new(component_id));
-                },
-            );
+            // HACKY HACKY GROSS DISGUSTING HACK OPPORTUNITY!!
+            //
+            // If you wish to have a singular type for a timeline that can be used both as a
+            // component and a resource, and don't mind doing things that should not be done, you
+            // can use the code below.
+            //
+            // This adds an observer that inserts the `IsResource` component correctly such that the
+            // type `T` can be used as a resource, even if it doesn't use the correct derives for
+            // the `Component` and `Resource `traits to make it a proper resource.
+            //
+            // This hack works on Bevy 0.19.0, but you shouldn't rely on it working with any version
+            // later, because this is explicitly deemed to be unsupported. If you do use this,
+            // please don't be annoying to Bevy contributors when something makes this not work
+            // anymore, because you've been warned lol
+            //
+            // For more information:
+            // https://github.com/bevyengine/bevy/issues/24686
+            //
+            //
+            //use bevy_ecs::{lifecycle::Add, observer::On, resource::IsResource};
+            //
+            //world.register_component::<T>();
+            //
+            //let component_id = world
+            //    .component_id::<T>()
+            //    .expect("Component was literally just registered a second ago");
+            //
+            //world.add_observer(
+            //    move |data: On<Add, T>, mut commands: bevy_ecs::system::Commands| {
+            //        commands
+            //            .entity(data.entity)
+            //            .insert_if_new(IsResource::new(component_id));
+            //    },
+            //);
 
             Ok(())
         }

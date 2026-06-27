@@ -49,16 +49,19 @@
 //!  app.run();
 //! ```
 //!
-//! To use with other components, or without `interpolation_for_transform` feature, you also need
+//! To use with other components or resources, or without `interpolation_for_transform` feature, you also need
 //! to register the component with an interpolation function.
 //!
 //! ```
 //! use bevy::prelude::*;
 //! use bevy_mod_time_travel::prelude::*;
-//! use bevy_mod_time_travel::interpolation::{Interpolated, InterpolationPlugin};
+//! use bevy_mod_time_travel::interpolation::{Interpolated, InterpolatedRes, InterpolationPlugin};
 //!
 //! #[derive(Clone, Component)]
 //! struct MyComponent(f32);
+//!
+//! #[derive(Clone, Resource)]
+//! struct MyResource(f32);
 //!
 //! let mut app = App::new();
 //!
@@ -74,9 +77,23 @@
 //!     )
 //!     .register_component();
 //!
-//! // Add `Interpolated::<MyComponent>::default()` to the entities.
+//! // Register the timeline with that particular resource.
+//! // Note: for resources, you have to use the other `InterpolatedRes` type.
+//! app.world_mut()
+//!     .register_timeline::<InterpolatedRes<MyResource>>()
+//!     .interpolate_with(
+//!     // Linear interpolation formula
+//!     |a, b, factor| MyResource(a.0 + (b.0 - a.0) * factor),
+//!     )
+//!     .register_resource();
+//!
+//! // Add `Interpolated<MyComponent>` to the entities.
 //! app.world_mut()
 //!     .spawn((Transform::default(), Interpolated::<MyComponent>::default()));
+//!
+//! // Add `InterpolatedRes<MyResource>` to the world.
+//! app.world_mut()
+//!     .insert_resource(InterpolatedRes::<MyResource>::default());
 //!
 //! // Enjoy.
 //! app.run();
@@ -86,7 +103,6 @@ use core::ops::{Deref, DerefMut};
 use core::time::Duration;
 
 use bevy_app::{App, FixedMainScheduleOrder, Plugin, RunFixedMainLoop, RunFixedMainLoopSystems};
-use bevy_ecs::component::{Mutable, StorageType};
 use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::ScheduleLabel;
 use bevy_time::{Fixed, Time, Virtual};
@@ -403,16 +419,23 @@ pub fn perform_interpolation(world: &mut World) {
     }
 }
 
-/// A timeline for the corresponding component/resource `T` that stores states produced within the
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default, ScheduleLabel)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+/// A [`Continuum`] for [`Interpolated<T>`] timelines.
+pub struct InterpolatedContinuum;
+impl Continuum for InterpolatedContinuum {}
+
+/// A timeline for the corresponding component `T` that stores states produced within the
 /// fixed timestep schedules and is used to interpolate between them.
 ///
-/// Note that for every type of component of resource you wish to interpolate, you need to
+/// Note that for every type of component you wish to interpolate, you need to
 /// run [`world.register_timeline<Interpolated<Something>>()`] first.
 ///
 /// [`world.register_timeline<Interpolated<Something>>()`]:
 /// super::world_methods::WorldTimeTravel::register_timeline
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Component)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "bevy_reflect", reflect(Component))]
 pub struct Interpolated<T: Clone + Send + Sync + 'static> {
     /// Buffer containing the values to interpolate between.
     pub buf: RewindBuffer<T>,
@@ -421,6 +444,18 @@ pub struct Interpolated<T: Clone + Send + Sync + 'static> {
     /// the rewind buffer should have `snap_to` set to true, and
     /// after that this should be set to false.
     pub teleported: bool,
+}
+
+// It's a timeline. Yeah.
+impl<T: Clone + Send + Sync + 'static> Timeline for Interpolated<T> {
+    type Item = T;
+    type Continuum = InterpolatedContinuum;
+    fn discontinuity(&self) -> bool {
+        self.teleported
+    }
+    fn reset_discontinuity(&mut self) {
+        self.teleported = false;
+    }
 }
 
 impl<T: Clone + Send + Sync + 'static> Default for Interpolated<T> {
@@ -448,14 +483,29 @@ impl<T: Clone + Send + Sync + 'static> DerefMut for Interpolated<T> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default, ScheduleLabel)]
+/// A timeline for the corresponding resource `T` that stores states produced within the
+/// fixed timestep schedules and is used to interpolate between them.
+///
+/// Note that for every type of resource you wish to interpolate, you need to
+/// run [`world.register_timeline<InterpolatedRes<Something>>()`] first.
+///
+/// [`world.register_timeline<InterpolatedRes<Something>>()`]:
+/// super::world_methods::WorldTimeTravel::register_timeline
+#[derive(Clone, Debug, Resource)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-/// A [`Continuum`] for [`Interpolated<T>`] timelines.
-pub struct InterpolatedContinuum;
-impl Continuum for InterpolatedContinuum {}
+#[cfg_attr(feature = "bevy_reflect", reflect(Resource))]
+pub struct InterpolatedRes<T: Clone + Send + Sync + 'static> {
+    /// Buffer containing the values to interpolate between.
+    pub buf: RewindBuffer<T>,
+    /// Whether or not the value was "teleported" in the
+    /// current tick. If set to `true`, the next moment written into
+    /// the rewind buffer should have `snap_to` set to true, and
+    /// after that this should be set to false.
+    pub teleported: bool,
+}
 
 // It's a timeline. Yeah.
-impl<T: Clone + Send + Sync + 'static> Timeline for Interpolated<T> {
+impl<T: Clone + Send + Sync + 'static> Timeline for InterpolatedRes<T> {
     type Item = T;
     type Continuum = InterpolatedContinuum;
     fn discontinuity(&self) -> bool {
@@ -466,10 +516,27 @@ impl<T: Clone + Send + Sync + 'static> Timeline for Interpolated<T> {
     }
 }
 
-// If T is Component, then this is too.
-impl<T: Component<Mutability = Mutable> + Clone> Component for Interpolated<T> {
-    const STORAGE_TYPE: StorageType = StorageType::Table;
-    type Mutability = Mutable;
+impl<T: Clone + Send + Sync + 'static> Default for InterpolatedRes<T> {
+    fn default() -> Self {
+        Self {
+            buf: RewindBuffer::with_capacity(2),
+            teleported: false,
+        }
+    }
 }
 
-impl<T: Resource<Mutability = Mutable> + Clone> Resource for Interpolated<T> {}
+// You should probably depend on `bevy_derive` and do `#[derive(Deref, DerefMut)]`
+// for your timelines. This code opts to implement them manually to avoid the extra
+// dependency.
+impl<T: Clone + Send + Sync + 'static> Deref for InterpolatedRes<T> {
+    type Target = RewindBuffer<T>;
+    fn deref(&self) -> &Self::Target {
+        &self.buf
+    }
+}
+
+impl<T: Clone + Send + Sync + 'static> DerefMut for InterpolatedRes<T> {
+    fn deref_mut(&mut self) -> &mut RewindBuffer<T> {
+        &mut self.buf
+    }
+}
