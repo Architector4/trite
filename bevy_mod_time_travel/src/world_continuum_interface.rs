@@ -60,7 +60,7 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
     /// Tries to rewind world state to specified time, without any interpolation, with specific
     /// policies.
     ///
-    /// Same as [`WorldTimeTravel::rewind_to`], but allows specifying change detection state and
+    /// Same as [`WorldContinuumInterface::rewind_to`], but allows specifying change detection state and
     /// out of timeline range policies.
     ///
     /// # Errors
@@ -123,7 +123,7 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
     /// Tries to interpolate world state to specified time with the provided out of timeline range
     /// policy.
     ///
-    /// Same as [`WorldTimeTravel::interpolate_to`], but allows specifying said policy. policy.
+    /// Same as [`WorldContinuumInterface::interpolate_to`], but allows specifying said policy. policy.
     ///
     /// # Errors
     ///
@@ -162,7 +162,7 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
     /// Deletes current world state before the provided `delete_before` time, and saves state at
     /// the current time.
     ///
-    /// To not delete any state, use [`WorldTimeTravel::insert_into_buffers`] or supply
+    /// To not delete any state, use [`WorldContinuumInterface::insert_into_buffers`] or supply
     /// `delete_before` value of [`Duration::ZERO`]. In doing so, **take caution** to not
     /// accumulate state indefinitely and run out of memory.
     pub fn rotate_buffers(&mut self, delete_before: Duration, current_time: Duration) {
@@ -292,7 +292,7 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
     /// the resource [`AccountForChanges<C>`]. Please don't do that, that's mean.
     ///
     /// [`Update`]: bevy_app::Update
-    /// [`delete_after`]: WorldTimeTravel::delete_after
+    /// [`delete_after`]: WorldContinuumInterface::delete_after
     /// [`InterpolationPlugin`]: super::interpolation::InterpolationPlugin
     pub fn account_for_changes(&mut self, overwrite_states: usize) -> bool {
         let continuum = C::default();

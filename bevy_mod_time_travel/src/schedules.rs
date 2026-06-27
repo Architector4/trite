@@ -117,9 +117,9 @@ pub enum OutOfTimelineRangePolicy {
 
 /// Labels for schedules used to perform time travel across a continuum.
 ///
-/// These schedules should normally be executed by methods in [`WorldTimeTravel`].
+/// These schedules should normally be executed by methods in [`WorldContinuumInterface`].
 ///
-/// [`WorldTimeTravel`]: super::world_methods::WorldTimeTravel
+/// [`WorldContinuumInterface`]: super::world_continuum_interface::WorldContinuumInterface
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, ScheduleLabel)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub enum TimeTravelSchedules<C: Continuum + Send + Sync + core::fmt::Debug> {
@@ -141,37 +141,37 @@ pub enum TimeTravelSchedules<C: Continuum + Send + Sync + core::fmt::Debug> {
     DeletingAfter(C),
     /// Deleting all stored state.
     Clearing(C),
-    /// Accounting for changes. See [`WorldTimeTravel::account_for_changes<C>`] for more
+    /// Accounting for changes. See [`WorldContinuumInterface::account_for_changes<C>`] for more
     /// information.
     ///
     /// When this is run, [`AccountForChanges<C>`] should be present to describe parameters.
     ///
-    /// [`WorldTimeTravel::account_for_changes<C>`]:
-    /// super::world_methods::WorldTimeTravel::account_for_changes<C>
+    /// [`WorldContinuumInterface::account_for_changes<C>`]:
+    /// super::world_continuum_interface::WorldContinuumInterface::account_for_changes<C>
     AccountingForChanges(C),
     /// Detecting items to clean up across the timeline. See
-    /// [`WorldTimeTravel::clean_up_empty<C>`] for more information.
+    /// [`WorldContinuumInterface::clean_up_empty<C>`] for more information.
     ///
     /// After this, the schedule [`TimeTravelSchedules::CleaningUpEmptyPerforming`] should be run.
     ///
     /// When this is run, [`CleanUpEmpty<C>`] should be present to carry the continuum.
     ///
-    /// [`WorldTimeTravel::clean_up_empty<C>`]:
-    /// super::world_methods::WorldTimeTravel::clean_up_empty<C>
+    /// [`WorldContinuumInterface::clean_up_empty<C>`]:
+    /// super::world_continuum_interface::WorldContinuumInterface::clean_up_empty<C>
     CleaningUpEmptyDetecting(C),
-    /// Cleaning up items across the timeline. See [`WorldTimeTravel::clean_up_empty<C>`] for more
+    /// Cleaning up items across the timeline. See [`WorldContinuumInterface::clean_up_empty<C>`] for more
     /// information.
     ///
     /// Before this, the schedule [`TimeTravelSchedules::CleaningUpEmptyDetecting`] should be run.
     ///
-    /// [`WorldTimeTravel::clean_up_empty<C>`]:
-    /// super::world_methods::WorldTimeTravel::clean_up_empty<C>
+    /// [`WorldContinuumInterface::clean_up_empty<C>`]:
+    /// super::world_continuum_interface::WorldContinuumInterface::clean_up_empty<C>
     CleaningUpEmptyPerforming(C),
     /// Cleaning up disabled entities across the timeline. See
-    /// [`WorldTimeTravel::clean_up_disabled<C>`] for more information.
+    /// [`WorldContinuumInterface::clean_up_disabled<C>`] for more information.
     ///
-    /// [`WorldTimeTravel::clean_up_disabled<C>`]:
-    /// super::world_methods::WorldTimeTravel::clean_up_disabled<C>
+    /// [`WorldContinuumInterface::clean_up_disabled<C>`]:
+    /// super::world_continuum_interface::WorldContinuumInterface::clean_up_disabled<C>
     CleaningUpDisabledEntities(C),
 }
 
