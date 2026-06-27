@@ -528,6 +528,48 @@ impl<T> RewindBuffer<T> {
         Ok(self.find_for_interpolation(time)?.pick_b())
     }
 
+    /// Insert a new moment into the buffer with correct ordering.
+    ///
+    /// This function finds the correct spot in the buffer to insert the new moment into, then
+    /// inserts it. The search is done in O(n) time. If you know that your moment comes after the
+    /// last moment in the buffer, it's better to use [`Self::push`] instead.
+    ///
+    /// # Errors
+    /// Errors if a moment already exists in the buffer at exactly the same time as the provided
+    /// one. In this case, the [`MomentMutProxy<T>`] is returned for the matching moment, letting
+    /// the caller handle the case.
+    pub fn insert_in_order(&mut self, new: Moment<T>) -> Result<(), MomentMutProxy<'_, T>> {
+        // First, quick check against the earliest moment.
+        let Some(first) = self.first_moment() else {
+            // No moments in the buffer? Just slap it in then lol
+            self.moments.push_back(new);
+            return Ok(());
+        };
+
+        if new.time < first.time {
+            // New moment is earlier than the first moment. Slap it in at the start lol
+            self.moments.push_front(new);
+            return Ok(());
+        }
+
+        for (idx, moment) in self.moments.iter().enumerate().rev() {
+            if moment.time == new.time {
+                return Err(self.moments[idx].as_proxy());
+            }
+
+            if new.time > moment.time {
+                // New moment is later than this one, but presumably earlier than all the other ones
+                // that were checked. Insert here.
+                self.moments.insert(idx + 1, new);
+                return Ok(());
+            }
+        }
+
+        unreachable!(
+            "Case of new moment being earlier than first moment was already accounted for"
+        );
+    }
+
     /// Insert a new moment at the end.
     ///
     /// This does not delete any moments, which might allow for accidental infinite growth; thus
@@ -698,7 +740,7 @@ mod tests {
     #[should_panic(
         expected = "Discontinuity in recorded moments:\nLast moment's time is 10s,\nbut tried inserting a moment at time 5s."
     )]
-    fn insert_out_or_order() {
+    fn insert_out_of_order() {
         let mut buf = RewindBuffer::<()>::new();
 
         buf.push(dummymoment(10));
@@ -750,5 +792,78 @@ mod tests {
         let Err(OutOfRecordedRangeError) = buf.find_for_interpolation(secs(99999)) else {
             panic!("out of range epic fail");
         };
+    }
+
+    #[test]
+    fn insert_in_order_before_first_moment() {
+        let mut buf = RewindBuffer::<()>::new();
+
+        buf.push(dummymoment(10));
+        buf.push(dummymoment(20));
+        buf.push(dummymoment(30));
+
+        buf.insert_in_order(dummymoment(5)).unwrap();
+
+        let mut iter = buf.iter();
+
+        assert_eq!(iter.next().unwrap().time, secs(5));
+        assert_eq!(iter.next().unwrap().time, secs(10));
+        assert_eq!(iter.next().unwrap().time, secs(20));
+        assert_eq!(iter.next().unwrap().time, secs(30));
+    }
+
+    #[test]
+    fn insert_in_order_inbetween_moments() {
+        let mut buf = RewindBuffer::<()>::new();
+
+        buf.push(dummymoment(10));
+        buf.push(dummymoment(20));
+        buf.push(dummymoment(30));
+
+        buf.insert_in_order(dummymoment(15)).unwrap();
+
+        let mut iter = buf.iter();
+
+        assert_eq!(iter.next().unwrap().time, secs(10));
+        assert_eq!(iter.next().unwrap().time, secs(15));
+        assert_eq!(iter.next().unwrap().time, secs(20));
+        assert_eq!(iter.next().unwrap().time, secs(30));
+    }
+
+    #[test]
+    fn insert_in_order_after_last_moment() {
+        let mut buf = RewindBuffer::<()>::new();
+
+        buf.push(dummymoment(10));
+        buf.push(dummymoment(20));
+        buf.push(dummymoment(30));
+
+        buf.insert_in_order(dummymoment(35)).unwrap();
+
+        let mut iter = buf.iter();
+
+        assert_eq!(iter.next().unwrap().time, secs(10));
+        assert_eq!(iter.next().unwrap().time, secs(20));
+        assert_eq!(iter.next().unwrap().time, secs(30));
+        assert_eq!(iter.next().unwrap().time, secs(35));
+    }
+
+    #[test]
+    fn insert_in_order_at_exact_same_time() {
+        let mut buf = RewindBuffer::<()>::new();
+
+        buf.push(dummymoment(10));
+        buf.push(dummymoment(20));
+        buf.push(dummymoment(30));
+
+        let proxy = buf.insert_in_order(dummymoment(30)).unwrap_err();
+
+        assert_eq!(*proxy.time, secs(30));
+
+        let mut iter = buf.iter();
+
+        assert_eq!(iter.next().unwrap().time, secs(10));
+        assert_eq!(iter.next().unwrap().time, secs(20));
+        assert_eq!(iter.next().unwrap().time, secs(30));
     }
 }
