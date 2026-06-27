@@ -9,10 +9,18 @@ for i in . */; do
 		chrt -i 0 ionice -c 3 cargo clippy --all-targets --keep-going&
 		chrt -i 0 ionice -c 3 cargo build --keep-going&
 		chrt -i 0 ionice -c 3 cargo build --release --keep-going&
-		chrt -i 0 ionice -c 3 cargo doc --keep-going&
 		chrt -i 0 ionice -c 3 cargo test&
 		wait
 		)&
 done
+
+# Separately do docs for that one crate lol
+(
+	cd bevy_mod_time_travel || return
+	chrt -i 0 ionice -c 3 cargo doc --keep-going&
+)&
+
 wait
+
+
 notify-send compiled
