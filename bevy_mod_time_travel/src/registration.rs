@@ -243,88 +243,75 @@ impl<T: TimelineComponent, Interp: InterpFunc<T::Item>>
     /// # Errors
     /// Errors if this was already done for this timeline.
     pub fn try_register_component(self) -> Result<(), AlreadyRegisteredError> {
-        /// Try to do common stuff for adding a component.
-        ///
-        /// # Errors
-        /// Errors if this was already done for this timeline.
-        // TODO: inline this lol
-        fn try_register_component_common<T: TimelineComponent>(
-            continuum_instance: T::Continuum,
-            world: &mut World,
-        ) -> Result<(), AlreadyRegisteredError> {
-            let mut schedules = world.get_resource_or_init::<Schedules>();
-            let rot_buf_sched = schedules.entry(TimeTravelSchedules::RotatingBuffers(
-                continuum_instance.clone(),
-            ));
+        let continuum_instance = T::Continuum::default();
 
-            // We want to check if we did this before with this timeline.
-            if has_system(
-                rot_buf_sched,
-                component_rotate_buffers::<T>.system_type_id(),
-            ) {
-                return Err(AlreadyRegisteredError);
-            }
+        let mut schedules = self.world.get_resource_or_init::<Schedules>();
+        let rot_buf_sched = schedules.entry(TimeTravelSchedules::RotatingBuffers(
+            continuum_instance.clone(),
+        ));
 
-            // We're all good, go forward.
-            rot_buf_sched.add_systems(component_rotate_buffers::<T>.in_set(TimeTravelSystemSet));
-
-            schedules
-                .entry(TimeTravelSchedules::Rewinding(continuum_instance.clone()))
-                .add_systems(component_rewind_to::<T>.in_set(TimeTravelSystemSet));
-
-            schedules
-                .entry(TimeTravelSchedules::DeletingAfter(
-                    continuum_instance.clone(),
-                ))
-                .add_systems(component_delete_after::<T>.in_set(TimeTravelSystemSet));
-
-            schedules
-                .entry(TimeTravelSchedules::Clearing(continuum_instance.clone()))
-                .add_systems(component_clear::<T>.in_set(TimeTravelSystemSet));
-
-            schedules
-                .entry(TimeTravelSchedules::AccountingForChanges(
-                    continuum_instance.clone(),
-                ))
-                .add_systems(component_account_for_changes::<T>.in_set(TimeTravelSystemSet));
-
-            schedules
-                .entry(TimeTravelSchedules::CleaningUpEmptyDetecting(
-                    continuum_instance.clone(),
-                ))
-                .add_systems(component_clean_up_detect::<T>.in_set(TimeTravelSystemSet));
-
-            // Clean up performing schedule is a little different from the rest: there's only one of it per
-            // a timeline continuum, while the above ones are one per timeline.
-            //
-            // Therefore, it needs a separate presence check.
-
-            let clean_up_sched = schedules.entry(TimeTravelSchedules::CleaningUpEmptyPerforming(
-                continuum_instance.clone(),
-            ));
-            let has_clean_up_system = has_system(
-                clean_up_sched,
-                component_clean_up_perform::<T::Continuum>.system_type_id(),
-            );
-            if !has_clean_up_system {
-                clean_up_sched.add_systems(
-                    component_clean_up_perform::<T::Continuum>.in_set(TimeTravelSystemSet),
-                );
-            }
-
-            if TypeId::of::<T::Item>() == TypeId::of::<bevy_ecs::entity_disabling::Disabled>() {
-                schedules
-                    .entry(TimeTravelSchedules::CleaningUpDisabledEntities(
-                        continuum_instance,
-                    ))
-                    .add_systems(clean_up_disabled::<T>.in_set(TimeTravelSystemSet));
-            }
-
-            Ok(())
+        // We want to check if we did this before with this timeline.
+        if has_system(
+            rot_buf_sched,
+            component_rotate_buffers::<T>.system_type_id(),
+        ) {
+            return Err(AlreadyRegisteredError);
         }
 
-        let continuum_instance = T::Continuum::default();
-        try_register_component_common::<T>(continuum_instance.clone(), self.world)?;
+        // We're all good, go forward.
+        rot_buf_sched.add_systems(component_rotate_buffers::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::Rewinding(continuum_instance.clone()))
+            .add_systems(component_rewind_to::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::DeletingAfter(
+                continuum_instance.clone(),
+            ))
+            .add_systems(component_delete_after::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::Clearing(continuum_instance.clone()))
+            .add_systems(component_clear::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::AccountingForChanges(
+                continuum_instance.clone(),
+            ))
+            .add_systems(component_account_for_changes::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::CleaningUpEmptyDetecting(
+                continuum_instance.clone(),
+            ))
+            .add_systems(component_clean_up_detect::<T>.in_set(TimeTravelSystemSet));
+
+        // Clean up performing schedule is a little different from the rest: there's only one of it per
+        // a timeline continuum, while the above ones are one per timeline.
+        //
+        // Therefore, it needs a separate presence check.
+
+        let clean_up_sched = schedules.entry(TimeTravelSchedules::CleaningUpEmptyPerforming(
+            continuum_instance.clone(),
+        ));
+        let has_clean_up_system = has_system(
+            clean_up_sched,
+            component_clean_up_perform::<T::Continuum>.system_type_id(),
+        );
+        if !has_clean_up_system {
+            clean_up_sched.add_systems(
+                component_clean_up_perform::<T::Continuum>.in_set(TimeTravelSystemSet),
+            );
+        }
+
+        if TypeId::of::<T::Item>() == TypeId::of::<bevy_ecs::entity_disabling::Disabled>() {
+            schedules
+                .entry(TimeTravelSchedules::CleaningUpDisabledEntities(
+                    continuum_instance.clone(),
+                ))
+                .add_systems(clean_up_disabled::<T>.in_set(TimeTravelSystemSet));
+        }
 
         let interp_func = component_interpolate_to_instantiator::<T>(self.interp_func);
 
@@ -399,103 +386,89 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
     /// # Errors
     /// Errors if this was already done for this timeline.
     pub fn try_register_resource(self) -> Result<(), AlreadyRegisteredError> {
-        /// Try to do common stuff for adding a resource.
-        ///
-        /// # Errors
-        /// Errors if this was already done for this timeline.
-        // TODO: inline this lol
-        fn register_resource_common<T: TimelineResource>(
-            continuum_instance: T::Continuum,
-            world: &mut World,
-        ) -> Result<(), AlreadyRegisteredError> {
-            let mut schedules = world.get_resource_or_init::<Schedules>();
-            let rot_buf_sched = schedules.entry(TimeTravelSchedules::RotatingBuffers(
-                continuum_instance.clone(),
-            ));
+        let continuum_instance = T::Continuum::default();
 
-            // We want to check if we did this before with this timeline.
-            if has_system(rot_buf_sched, resource_rotate_buffers::<T>.system_type_id()) {
-                return Err(AlreadyRegisteredError);
-            }
+        let mut schedules = self.world.get_resource_or_init::<Schedules>();
+        let rot_buf_sched = schedules.entry(TimeTravelSchedules::RotatingBuffers(
+            continuum_instance.clone(),
+        ));
 
-            // We're all good, go forward.
-            rot_buf_sched.add_systems(resource_rotate_buffers::<T>.in_set(TimeTravelSystemSet));
-
-            schedules
-                .entry(TimeTravelSchedules::Rewinding(continuum_instance.clone()))
-                .add_systems(resource_rewind_to::<T>.in_set(TimeTravelSystemSet));
-
-            schedules
-                .entry(TimeTravelSchedules::DeletingAfter(
-                    continuum_instance.clone(),
-                ))
-                .add_systems(resource_delete_after::<T>.in_set(TimeTravelSystemSet));
-
-            schedules
-                .entry(TimeTravelSchedules::Clearing(continuum_instance.clone()))
-                .add_systems(resource_clear::<T>.in_set(TimeTravelSystemSet));
-
-            schedules
-                .entry(TimeTravelSchedules::AccountingForChanges(
-                    continuum_instance.clone(),
-                ))
-                .add_systems(
-                    resource_account_for_changes_if_changed::<T>
-                        .run_if(
-                            resource_added::<T::Item>
-                                .or_eager(resource_changed_or_removed::<T::Item>),
-                        )
-                        .in_set(TimeTravelSystemSet),
-                );
-
-            // Don't have much detecting to do here lol
-
-            schedules
-                .entry(TimeTravelSchedules::CleaningUpEmptyPerforming(
-                    continuum_instance,
-                ))
-                .add_systems(resource_clean_up_perform::<T>.in_set(TimeTravelSystemSet));
-
-            // HACKY HACKY GROSS DISGUSTING HACK OPPORTUNITY!!
-            //
-            // If you wish to have a singular type for a timeline that can be used both as a
-            // component and a resource, and don't mind doing things that should not be done, you
-            // can use the code below.
-            //
-            // This adds an observer that inserts the `IsResource` component correctly such that the
-            // type `T` can be used as a resource, even if it doesn't use the correct derives for
-            // the `Component` and `Resource `traits to make it a proper resource.
-            //
-            // This hack works on Bevy 0.19.0, but you shouldn't rely on it working with any version
-            // later, because this is explicitly deemed to be unsupported. If you do use this,
-            // please don't be annoying to Bevy contributors when something makes this not work
-            // anymore, because you've been warned lol
-            //
-            // For more information:
-            // https://github.com/bevyengine/bevy/issues/24686
-            //
-            //
-            //use bevy_ecs::{lifecycle::Add, observer::On, resource::IsResource};
-            //
-            //world.register_component::<T>();
-            //
-            //let component_id = world
-            //    .component_id::<T>()
-            //    .expect("Component was literally just registered a second ago");
-            //
-            //world.add_observer(
-            //    move |data: On<Add, T>, mut commands: bevy_ecs::system::Commands| {
-            //        commands
-            //            .entity(data.entity)
-            //            .insert_if_new(IsResource::new(component_id));
-            //    },
-            //);
-
-            Ok(())
+        // We want to check if we did this before with this timeline.
+        if has_system(rot_buf_sched, resource_rotate_buffers::<T>.system_type_id()) {
+            return Err(AlreadyRegisteredError);
         }
 
-        let continuum_instance = T::Continuum::default();
-        register_resource_common::<T>(continuum_instance.clone(), self.world)?;
+        // We're all good, go forward.
+        rot_buf_sched.add_systems(resource_rotate_buffers::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::Rewinding(continuum_instance.clone()))
+            .add_systems(resource_rewind_to::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::DeletingAfter(
+                continuum_instance.clone(),
+            ))
+            .add_systems(resource_delete_after::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::Clearing(continuum_instance.clone()))
+            .add_systems(resource_clear::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::AccountingForChanges(
+                continuum_instance.clone(),
+            ))
+            .add_systems(
+                resource_account_for_changes_if_changed::<T>
+                    .run_if(
+                        resource_added::<T::Item>.or_eager(resource_changed_or_removed::<T::Item>),
+                    )
+                    .in_set(TimeTravelSystemSet),
+            );
+
+        // Don't have much detecting to do here lol
+
+        schedules
+            .entry(TimeTravelSchedules::CleaningUpEmptyPerforming(
+                continuum_instance.clone(),
+            ))
+            .add_systems(resource_clean_up_perform::<T>.in_set(TimeTravelSystemSet));
+
+        // HACKY HACKY GROSS DISGUSTING HACK OPPORTUNITY!!
+        //
+        // If you wish to have a singular type for a timeline that can be used both as a
+        // component and a resource, and don't mind doing things that should not be done, you
+        // can use the code below.
+        //
+        // This adds an observer that inserts the `IsResource` component correctly such that the
+        // type `T` can be used as a resource, even if it doesn't use the correct derives for
+        // the `Component` and `Resource `traits to make it a proper resource.
+        //
+        // This hack works on Bevy 0.19.0, but you shouldn't rely on it working with any version
+        // later, because this is explicitly deemed to be unsupported. If you do use this,
+        // please don't be annoying to Bevy contributors when something makes this not work
+        // anymore, because you've been warned lol
+        //
+        // For more information:
+        // https://github.com/bevyengine/bevy/issues/24686
+        //
+        //
+        //use bevy_ecs::{lifecycle::Add, observer::On, resource::IsResource};
+        //
+        //self.world.register_component::<T>();
+        //
+        //let component_id = self.world
+        //    .component_id::<T>()
+        //    .expect("Component was literally just registered a second ago");
+        //
+        //self.world.add_observer(
+        //    move |data: On<Add, T>, mut commands: bevy_ecs::system::Commands| {
+        //        commands
+        //            .entity(data.entity)
+        //            .insert_if_new(IsResource::new(component_id));
+        //    },
+        //);
 
         let interp_func = resource_interpolate_to_instantiator::<T>(self.interp_func);
 
