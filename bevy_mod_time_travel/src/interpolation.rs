@@ -307,7 +307,7 @@ pub fn return_to_fixed(world: &mut World) {
 
     if account_for_changes {
         // Overwrite last 1 state where it changed.
-        continuum.account_for_changes(1);
+        continuum.account_for_changes(Some(Duration::ZERO));
     }
 
     if let Ok(resulting_time) = continuum.rewind_to_with_policies(
@@ -385,9 +385,11 @@ pub fn perform_interpolation(world: &mut World) {
         .saturating_sub(fixed.timestep());
 
     if variables.account_for_changes {
+        // If a change has occurred, it's enough to overwrite exactly the region we're interpolating
+        // between.
         world
             .continuum::<InterpolatedContinuum>()
-            .account_for_changes(2);
+            .account_for_changes(Some(fixed.timestep()));
     }
 
     if let Some(continuum_time) = world.get_resource::<ContinuumTime<InterpolatedContinuum>>()

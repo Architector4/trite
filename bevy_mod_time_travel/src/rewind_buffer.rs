@@ -627,6 +627,70 @@ impl<T> RewindBuffer<T> {
         }
     }
 
+    /// Overwrite values range specified by the `range` argument by the provided item. See
+    /// [`Self::overwrite_range_with_moments`] for more information.
+    ///
+    /// The `snap_to` parameter is set within the new moments written to the buffer.
+    pub fn overwrite_range(
+        &mut self,
+        range: &RangeInclusive<Duration>,
+        snap_to: bool,
+        item: Option<(ChangeDetectionState, T)>,
+    ) where
+        T: Clone,
+    {
+        // Package up this fancy new state into a moment...
+        let moment_a = Moment {
+            time: *range.start(),
+            snap_to,
+            item,
+        };
+
+        if range.start().eq(range.end()) {
+            // Singular point range. Insert in order.
+            let _ = self.insert_in_order(moment_a);
+        } else {
+            let mut moment_b = moment_a.clone();
+            moment_b.time = *range.end();
+
+            self.overwrite_range_with_moments(moment_a, moment_b);
+        }
+    }
+
+    /// Deletes all items in the range encompassed by the times of `a` and `b` and inserts these new
+    /// moments, essentially overwriting the range.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the two provided moments have the exact same time. If you need to do that, use
+    /// [`Self::insert_in_order`] instead.
+    pub fn overwrite_range_with_moments(&mut self, a: Moment<T>, b: Moment<T>) {
+        use core::cmp::Ordering;
+        let (from, to) = match a.time.cmp(&b.time) {
+            Ordering::Less => (a, b),
+            Ordering::Equal => panic!("Provided moments have the exact same time {:?}", a.time),
+            Ordering::Greater => (b, a),
+        };
+
+        self.moments
+            .retain(|m| m.time < from.time || m.time > to.time);
+
+        let Some(first_moment_after_idx) = self
+            .iter()
+            .enumerate()
+            .find(|x| x.1.time > from.time)
+            .map(|x| x.0)
+        else {
+            // Empty buffer? Don't mind if I do.
+            self.push(from);
+            self.push(to);
+            return;
+        };
+
+        self.moments.insert(first_moment_after_idx, from);
+        self.moments.insert(first_moment_after_idx + 1, to);
+    }
+
     /// Delete all moments stored in this buffer.
     pub fn clear(&mut self) {
         self.moments.clear();

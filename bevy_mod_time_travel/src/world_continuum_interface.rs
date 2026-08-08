@@ -238,8 +238,9 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
     /// simple way.
     ///
     /// If any resource or entity's component is changed since the last time this method or
-    /// [`Self::discard_changes`] is run, the last `overwrite_states` recorded states in the
-    /// corresponding timeline are replaced with the latest state of it in the world.
+    /// [`Self::discard_changes`] is run, and the `overwrite_everything_in_past` argument is `Some`,
+    /// the recorded range between the last recorded moment and last recorded minus the argument's
+    /// value are replaced with the new state.
     ///
     /// Returns true if any such change is detected.
     ///
@@ -282,6 +283,9 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
     /// time with [`Self::delete_after`], and then recompute it all with the modified state in
     /// mind.
     ///
+    /// This method's return value indicates if change has occurred, which can be used to trigger
+    /// such rollback.
+    ///
     /// Besides computational cost, this may also bring floating point accuracy issues if you have
     /// to work from an interpolated state, or various breakage due to nondeterminism of systems in
     /// Bevy and inability to fully rewind them.
@@ -294,14 +298,31 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
     /// [`Update`]: bevy_app::Update
     /// [`delete_after`]: WorldContinuumInterface::delete_after
     /// [`InterpolationPlugin`]: super::interpolation::InterpolationPlugin
-    pub fn account_for_changes(&mut self, overwrite_states: usize) -> bool {
+    pub fn account_for_changes(&mut self, overwrite_everything_in_past: Option<Duration>) -> bool {
         let continuum = C::default();
 
         #[cfg(feature = "logging")]
-        trace!("{continuum:?}: Accounting for changes overwriting {overwrite_states} states...");
+        trace!(
+            "{continuum:?}: Accounting for changes overwriting states in past {overwrite_everything_in_past:?}..."
+        );
+
+        // To overwrite stuff, we need both the parameter to be a `Some`, and for stuff that we
+        // would overwrite to actually exist. The latter is indicated by `ContinuumTime<C>`, which
+        // we conveniently need anyway.
+        let overwrite_range = if let Some(in_past) = overwrite_everything_in_past
+            && let Some(last_recorded_time) = self
+                .world
+                .get_resource::<Timekeep<C>>()
+                .and_then(|x| x.last_moment())
+                .map(|m| m.time)
+        {
+            Some(last_recorded_time.saturating_sub(in_past)..=last_recorded_time)
+        } else {
+            None
+        };
 
         self.world.insert_resource(AccountForChanges {
-            overwrite_states,
+            overwrite_range,
             change_detected: AtomicBool::new(false),
             continuum: continuum.clone(),
         });
@@ -317,7 +338,7 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
     /// Discard all changes performed since the last time `account_for_changes` or
     /// `discard_changes` is run.
     pub fn discard_changes(&mut self) {
-        let _ = self.account_for_changes(0);
+        let _ = self.account_for_changes(None);
     }
 
     /// Clean up entities/resources that are empty across their timeline.

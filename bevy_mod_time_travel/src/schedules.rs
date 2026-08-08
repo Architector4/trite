@@ -15,7 +15,7 @@ use bevy_ecs::{
     system::{Commands, IntoSystem, Query, Res, ResMut, System},
     world::{Ref, World},
 };
-use core::{sync::atomic::AtomicBool, time::Duration};
+use core::{ops::RangeInclusive, sync::atomic::AtomicBool, time::Duration};
 
 use crate::OutOfRecordedRangeError;
 
@@ -233,8 +233,9 @@ pub struct DeleteAfter<C: Continuum> {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "bevy_reflect", reflect(Resource))]
 pub struct AccountForChanges<C: Continuum> {
-    /// How many states, from the end, to overwrite with latest.
-    pub overwrite_states: usize,
+    /// If any changes are detected, all states in this range will be overwritten with the new
+    /// state.
+    pub overwrite_range: Option<RangeInclusive<Duration>>,
     /// Set to true if any change was detected.
     pub change_detected: AtomicBool,
     /// Timeline continuum.
@@ -454,16 +455,20 @@ pub fn component_account_for_changes<T: TimelineComponent>(
     >,
     mut deletions: RemovedComponents<T::Item>,
 ) {
-    if account_for_changes.overwrite_states > 0 {
+    if let Some(overwrite_range) = &account_for_changes.overwrite_range {
         items.par_iter_mut().for_each(|(entity, mut buf, item)| {
             if adds_changes.contains(entity) {
                 account_for_changes
                     .change_detected
                     .store(true, core::sync::atomic::Ordering::Relaxed);
-                buf.enforce_for_n_last(
-                    account_for_changes.overwrite_states,
+
+                // Do the overwrites in question.
+                let snap_to = buf.discontinuity();
+                buf.overwrite_range(
+                    overwrite_range,
+                    snap_to,
                     item.as_ref()
-                        .map(|x| (ChangeDetectionState::from(x), x.as_ref())),
+                        .map(|x| (ChangeDetectionState::from(x), x.as_ref().clone())),
                 );
             }
         });
@@ -476,19 +481,26 @@ pub fn component_account_for_changes<T: TimelineComponent>(
 
     // Also account for deletions.
     for d in deletions.read() {
-        // Note: not all deletions are from entities with the timeline.
+        // Note: not all deletions are from entities with the timeline, so we need to loop over
+        // anyway.
         if let Ok((_, mut buf, item)) = items.get_mut(d) {
             account_for_changes
                 .change_detected
                 .store(true, core::sync::atomic::Ordering::Relaxed);
 
-            if account_for_changes.overwrite_states > 0 {
-                // It might still exist or whatnot else... Probably worth doing the enforcing.
-                buf.enforce_for_n_last(
-                    account_for_changes.overwrite_states,
+            if let Some(overwrite_range) = &account_for_changes.overwrite_range {
+                // Do the overwrites in question.
+                let snap_to = buf.discontinuity();
+                buf.overwrite_range(
+                    overwrite_range,
+                    snap_to,
                     item.as_ref()
-                        .map(|x| (ChangeDetectionState::from(x), x.as_ref())),
+                        .map(|x| (ChangeDetectionState::from(x), x.as_ref().clone())),
                 );
+            } else {
+                // We've seen at least one delete and have already indicated it. That's enough.
+                deletions.clear();
+                break;
             }
         }
     }
@@ -742,11 +754,16 @@ pub fn resource_account_for_changes_if_changed<T: TimelineResource>(
         account_for_changes
             .change_detected
             .store(true, core::sync::atomic::Ordering::Relaxed);
-        buf.enforce_for_n_last(
-            account_for_changes.overwrite_states,
-            item.as_ref()
-                .map(|x| (ChangeDetectionState::from(x), x.as_ref())),
-        );
+        if let Some(overwrite_range) = &account_for_changes.overwrite_range {
+            // Do the overwrites in question.
+            let snap_to = buf.discontinuity();
+            buf.overwrite_range(
+                overwrite_range,
+                snap_to,
+                item.as_ref()
+                    .map(|x| (ChangeDetectionState::from(x), x.as_ref().clone())),
+            );
+        }
     }
 }
 
