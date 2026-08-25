@@ -1,6 +1,7 @@
 use core::{any::TypeId, marker::PhantomData};
 
 use bevy_ecs::{
+    message::Messages,
     schedule::{
         IntoScheduleConfigs, Schedule, Schedules, SystemCondition,
         common_conditions::{resource_added, resource_changed_or_removed},
@@ -15,7 +16,9 @@ use bevy_animation::animatable::Animatable;
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::GetTypeRegistration;
 
-use super::continuum::{Timeline, TimelineComponent, TimelineResource};
+use crate::timed_messages_buffer::Reverse;
+
+use super::continuum::{MessageTimeline, Timeline, TimelineComponent, TimelineResource};
 use super::schedules::*;
 use super::{InterpFunc, pick_b_if_nonzero};
 
@@ -57,7 +60,7 @@ pub struct Unspecified;
 /// [`WorldTimeTravel`]: super::world_methods::WorldTimeTravel
 /// [`WorldTimeTravel::register_timeline`]: super::world_methods::WorldTimeTravel::register_timeline
 #[must_use = "does not do anything until `.register_component` or `.register_resource` is called."]
-pub struct RegisterTimeline<'a, T: Timeline, Interp = Unspecified, Reflect = Unspecified> {
+pub struct RegisterTimeline<'a, T, Interp = Unspecified, Reflect = Unspecified> {
     /// World we're registering into.
     world: &'a mut World,
     /// Timeline type we're registering.
@@ -69,7 +72,7 @@ pub struct RegisterTimeline<'a, T: Timeline, Interp = Unspecified, Reflect = Uns
     reflect_func: Reflect,
 }
 
-impl<'a, T: Timeline> RegisterTimeline<'a, T> {
+impl<'a, T> RegisterTimeline<'a, T> {
     /// Create a new instance. For ergonomics, you might want to use the equivalent function
     /// [`WorldTimeTravel::register_timeline`] instead.
     ///
@@ -125,6 +128,8 @@ impl<
 > RegisterTimeline<'a, T, Interp, Unspecified>
 {
     /// Sets this to also reflect the timeline in the type registry of this world.
+    ///
+    /// For a version that applies to message timelines, use [`Self::reflect_message_timeline`] instead.
     pub fn reflect(self) -> RegisterTimeline<'a, T, Interp, impl Fn(&mut World)> {
         /// Do reflection stuff for a timeline.
         #[cfg(feature = "bevy_reflect")]
@@ -222,7 +227,7 @@ impl<T: TimelineComponent, Interp: InterpFunc<T::Item>>
 {
     /// Register this component timeline **without** reflection.
     ///
-    /// To use reflection, run [`RegisterTimeline::reflect`] first.
+    /// To use reflection, run [`Self::reflect`] first.
     ///
     /// # Panics
     /// Panics if this was already done for this timeline.
@@ -238,7 +243,7 @@ impl<T: TimelineComponent, Interp: InterpFunc<T::Item>>
 
     /// Try to register this component timeline **without** reflection.
     ///
-    /// To use reflection, run [`RegisterTimeline::reflect`] first.
+    /// To use reflection, run [`Self::reflect`] first.
     ///
     /// # Errors
     /// Errors if this was already done for this timeline.
@@ -365,7 +370,7 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
 {
     /// Register this resource timeline **without** reflection.
     ///
-    /// To use reflection, run [`RegisterTimeline::reflect`] first.
+    /// To use reflection, run [`Self::reflect`] first.
     ///
     /// # Panics
     /// Panics if this was already done for this timeline.
@@ -476,6 +481,179 @@ impl<T: TimelineResource, Interp: InterpFunc<T::Item>>
             .get_resource_or_init::<Schedules>()
             .entry(TimeTravelSchedules::Interpolating(continuum_instance))
             .add_systems(interp_func.in_set(TimeTravelSystemSet));
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "bevy_reflect")]
+impl<
+    'a,
+    T: MessageTimeline<Message: GetTypeRegistration, Continuum: GetTypeRegistration>
+        + GetTypeRegistration,
+> RegisterTimeline<'a, T, Unspecified, Unspecified>
+{
+    /// Sets this to also reflect the message timeline in the type registry of this world.
+    ///
+    /// For a version that applies to component/resource timelines, use [`Self::reflect`] instead.
+    pub fn reflect_message_timeline(
+        self,
+    ) -> RegisterTimeline<'a, T, Unspecified, impl Fn(&mut World)> {
+        /// Do reflection stuff for a timeline.
+        #[cfg(feature = "bevy_reflect")]
+        fn reflect_timeline<
+            T: super::continuum::MessageTimeline<
+                    Message: GetTypeRegistration,
+                    Continuum: GetTypeRegistration,
+                > + GetTypeRegistration,
+        >(
+            world: &mut World,
+        ) {
+            let registry = world.get_resource_or_init::<bevy_ecs::reflect::AppTypeRegistry>();
+            let mut registry_write = registry.write();
+
+            // Do the funny.
+            registry_write.register::<T>();
+
+            // These appear to be redundant.
+            //registry_write.register::<T::Item>();
+            //registry_write.register::<super::rewind_buffer::RewindBuffer<T::Item>>();
+            //registry_write.register::<super::rewind_buffer::Moment<T::Item>>();
+
+            // While we're here, register the continuum itself too.
+            registry_write.register::<T::Continuum>();
+        }
+
+        RegisterTimeline {
+            world: self.world,
+            timeline: self.timeline,
+            interp_func: self.interp_func,
+            reflect_func: reflect_timeline::<T>,
+        }
+    }
+}
+
+#[cfg(feature = "bevy_reflect")]
+impl<T: MessageTimeline, Reflect: Fn(&mut World)> RegisterTimeline<'_, T, Unspecified, Reflect> {
+    /// Register this message timeline with reflection.
+    /// This also registers `T::Message` and [`Reverse<…>`] as message types into the world, if not
+    /// registered already.
+    ///
+    /// # Panics
+    /// Panics if this was already done for this timeline.
+    ///
+    /// For a version that errors instead, use [`Self::try_register_message`].
+    #[inline]
+    #[track_caller]
+    pub fn register_message(self) {
+        if let Err(AlreadyRegisteredError) = self.try_register_message() {
+            panic!("{}", AlreadyRegisteredError);
+        }
+    }
+
+    /// Try to register this message timeline with reflection.
+    /// This also registers `T::Message` and [`Reverse<…>`] as message types into the world, if not
+    /// registered already.
+    ///
+    /// # Errors
+    /// Errors if this was already done for this timeline.
+    pub fn try_register_message(self) -> Result<(), AlreadyRegisteredError> {
+        (self.reflect_func)(self.world);
+
+        let noreflect = RegisterTimeline {
+            world: self.world,
+            timeline: self.timeline,
+            interp_func: Unspecified,
+            reflect_func: Unspecified,
+        };
+
+        noreflect.try_register_message()
+    }
+}
+
+impl<T: MessageTimeline> RegisterTimeline<'_, T, Unspecified, Unspecified> {
+    /// Register this message timeline **without** reflection.
+    /// This also registers `T::Message` and [`Reverse<…>`] as message types into the world, if not
+    /// registered already.
+    ///
+    /// To use reflection, run [`Self::reflect`] first.
+    ///
+    /// # Panics
+    /// Panics if this was already done for this timeline.
+    ///
+    /// For a version that errors instead, use [`Self::try_register_message`].
+    pub fn register_message(self) {
+        if let Err(AlreadyRegisteredError) = self.try_register_message() {
+            panic!("{}", AlreadyRegisteredError);
+        }
+    }
+
+    /// Try to register this message timeline **without** reflection.
+    /// This also registers `T::Message` and [`Reverse<…>`] as message types into the world, if not
+    /// registered already.
+    ///
+    /// To use reflection, run [`Self::reflect`] first.
+    ///
+    /// # Errors
+    /// Errors if this was already done for this timeline.
+    pub fn try_register_message(self) -> Result<(), AlreadyRegisteredError> {
+        // INSERT A TimeTravelledMessageCursor
+
+        let continuum_instance = T::Continuum::default();
+
+        let mut schedules = self.world.get_resource_or_init::<Schedules>();
+        let rot_buf_sched = schedules.entry(TimeTravelSchedules::RotatingBuffers(
+            continuum_instance.clone(),
+        ));
+
+        // We want to check if we did this before with this timeline.
+        if has_system(rot_buf_sched, message_rotate_buffers::<T>.system_type_id()) {
+            return Err(AlreadyRegisteredError);
+        }
+
+        // We're all good, go forward.
+        rot_buf_sched.add_systems(message_rotate_buffers::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::Rewinding(continuum_instance.clone()))
+            .add_systems(message_rewind_to::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::Interpolating(
+                continuum_instance.clone(),
+            ))
+            .add_systems(message_rewind_to::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::DeletingAfter(
+                continuum_instance.clone(),
+            ))
+            .add_systems(message_delete_after::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::Clearing(continuum_instance.clone()))
+            .add_systems(message_clear::<T>.in_set(TimeTravelSystemSet));
+
+        schedules
+            .entry(TimeTravelSchedules::AccountingForChanges(
+                continuum_instance.clone(),
+            ))
+            .add_systems(message_account_for_changes::<T>.in_set(TimeTravelSystemSet));
+
+        // Register the messages to the world, just in case...
+
+        if !self.world.contains_resource::<Messages<T::Message>>() {
+            bevy_ecs::message::MessageRegistry::register_message::<T::Message>(self.world);
+        }
+
+        if !self
+            .world
+            .contains_resource::<Messages<Reverse<T::Message>>>()
+        {
+            bevy_ecs::message::MessageRegistry::register_message::<Reverse<T::Message>>(self.world);
+        }
+
+        self.world.init_resource::<TimeTravelledMessageCursor<T>>();
 
         Ok(())
     }

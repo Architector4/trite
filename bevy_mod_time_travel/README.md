@@ -21,6 +21,7 @@ For a general overview of the primary API surface of this crate, see file `examp
 - Best-effort preservation of change detection state when rewinding, or options for otherwise.
 - A method for detecting change in the world state tracked by a continuum.
 - Quick and easy API to "time travel" a world across a continuum once you're set up.
+- Tracking and rewinding messages (currently not tested much).
 
 # Here you don't get:
 
@@ -29,8 +30,7 @@ These things the crate currently does **not** do, but might in some future:
   grouped into separate continuums instead if needed.
 - Automatically inserting time travel systems per timeline (i.e. per component/resource). For this,
   use `WorldTimeTravel::register_timeline` on the relevant timeline.
-- Any interaction with `Local` parameters of systems, including message reader cursors. Because of
-  this, Bevy messages are not supported.
+- Any interaction with `Local` parameters of systems.
 - Any interpolation that involves more than just two points of input data and a single scalar
   factor; for example Hermite interpolation. It is possible to implement such, but no API is
   provided for this here.

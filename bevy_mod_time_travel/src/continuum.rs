@@ -5,11 +5,13 @@ use core::{
 
 use bevy_ecs::{
     component::{Component, Mutable},
+    message::Message,
     resource::Resource,
     schedule::ScheduleLabel,
 };
 
 use super::rewind_buffer::RewindBuffer;
+use super::timed_messages_buffer::TimedMessagesBuffer;
 
 /// Trait for types representing a series of timestamped states, i.e. [`Moment`]s. Used by Bevy systems in this
 /// crate.
@@ -17,6 +19,8 @@ use super::rewind_buffer::RewindBuffer;
 /// For example, a [`Timeline<Item = Transform>`] is a component that holds a
 /// [`RewindBuffer<Transform>`] and is responsible for saving and manipulating the state of the
 /// `Transform` component on the same entity across time.
+///
+/// There's an equivalent but separate trait for message timelines; see [`MessageTimeline`].
 ///
 /// [`Moment`]: super::rewind_buffer::Moment
 pub trait Timeline:
@@ -76,4 +80,19 @@ pub trait TimelineResource:
 impl<T: Timeline<Item: Resource<Mutability = Mutable>> + Resource<Mutability = Mutable>>
     TimelineResource for T
 {
+}
+
+/// Trait for types representing a series of timestamped messages. Used by Bevy systems in this
+/// crate.
+pub trait MessageTimeline:
+    Deref<Target = TimedMessagesBuffer<Self::Message>>
+    + DerefMut<Target = TimedMessagesBuffer<Self::Message>>
+    + Resource<Mutability = Mutable>
+{
+    /// Message type that this timeline is for.
+    // Trait bound as needed by `RewindBuffer`
+    type Message: Clone + Send + Sync + 'static + Message;
+
+    /// What [`Continuum`] is this timeline a part of.
+    type Continuum: Continuum;
 }

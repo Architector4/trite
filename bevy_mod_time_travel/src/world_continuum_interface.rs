@@ -81,6 +81,11 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
             return Err(OutOfRecordedRangeError);
         }
 
+        let from = self
+            .world
+            .get_resource::<ContinuumTime<C>>()
+            .map(|x| x.time);
+
         let continuum = C::default();
 
         #[cfg(feature = "logging")]
@@ -88,13 +93,14 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
 
         self.world.insert_resource(RewindTo {
             to,
+            from,
             tick_restore_policy,
             out_of_timeline_range_policy,
             continuum: continuum.clone(),
         });
         self.world
             .run_schedule(TimeTravelSchedules::Rewinding(continuum));
-        self.world.remove_resource::<InterpolateTo<C>>();
+        self.world.remove_resource::<RewindTo<C>>();
 
         Ok(self.world.resource_mut::<ContinuumTime<C>>().time)
     }
@@ -142,6 +148,11 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
             return Err(OutOfRecordedRangeError);
         }
 
+        let from = self
+            .world
+            .get_resource::<ContinuumTime<C>>()
+            .map(|x| x.time);
+
         let continuum = C::default();
 
         #[cfg(feature = "logging")]
@@ -149,6 +160,7 @@ impl<'a, C: Continuum> WorldContinuumInterface<'a, C> {
 
         self.world.insert_resource(InterpolateTo {
             to,
+            from,
             out_of_timeline_range_policy,
             continuum: continuum.clone(),
         });

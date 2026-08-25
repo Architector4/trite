@@ -9,6 +9,7 @@ use bevy_ecs::{
     entity::Entity,
     entity_disabling::Disabled,
     lifecycle::RemovedComponents,
+    message::{MessageCursor, MessageReader, Messages},
     query::{Added, Allow, AnyOf, Changed, Or, With, Without},
     resource::Resource,
     schedule::{ScheduleLabel, SystemSet},
@@ -17,10 +18,11 @@ use bevy_ecs::{
 };
 use core::{ops::RangeInclusive, sync::atomic::AtomicBool, time::Duration};
 
-use crate::OutOfRecordedRangeError;
+use crate::timed_messages_buffer::{Reverse, TimedMessage};
 
 use super::InterpFunc;
-use super::continuum::{Continuum, TimelineComponent, TimelineResource};
+use super::OutOfRecordedRangeError;
+use super::continuum::{Continuum, MessageTimeline, TimelineComponent, TimelineResource};
 use super::rewind_buffer::{ChangeDetectionState, Moment};
 
 #[cfg(feature = "bevy_reflect")]
@@ -125,7 +127,7 @@ pub enum OutOfTimelineRangePolicy {
 pub enum TimeTravelSchedules<C: Continuum + Send + Sync + core::fmt::Debug> {
     /// Rewinding to a fixed recorded point in time.
     ///
-    /// When this is run, [`InterpolateTo<C>`] should be present to describe where to.
+    /// When this is run, [`RewindTo<C>`] should be present to describe where to.
     Rewinding(C),
     /// Producing a whole new world state by interpolating recorded points in time.
     ///
@@ -189,9 +191,22 @@ pub struct TimeTravelSystemSet;
 #[cfg_attr(feature = "bevy_reflect", reflect(Resource))]
 pub struct RewindTo<C: Continuum> {
     pub to: Duration,
+    pub from: Option<Duration>,
     pub tick_restore_policy: TickRestorePolicy,
     pub out_of_timeline_range_policy: OutOfTimelineRangePolicy,
     pub continuum: C,
+}
+
+// Tiny convenience impl lol
+impl<C: Continuum> From<RewindTo<C>> for InterpolateTo<C> {
+    fn from(val: RewindTo<C>) -> Self {
+        InterpolateTo {
+            to: val.to,
+            from: val.from,
+            out_of_timeline_range_policy: val.out_of_timeline_range_policy,
+            continuum: val.continuum,
+        }
+    }
 }
 
 /// Parameters for [`TimeTravelSchedules::Interpolating`].
@@ -200,6 +215,7 @@ pub struct RewindTo<C: Continuum> {
 #[cfg_attr(feature = "bevy_reflect", reflect(Resource))]
 pub struct InterpolateTo<C: Continuum> {
     pub to: Duration,
+    pub from: Option<Duration>,
     pub out_of_timeline_range_policy: OutOfTimelineRangePolicy,
     pub continuum: C,
 }
@@ -777,5 +793,134 @@ pub fn resource_clean_up_perform<C: TimelineResource>(
     {
         commands.remove_resource::<C>();
         commands.remove_resource::<C::Item>();
+    }
+}
+
+/// Resource that shares the message cursor between different message systems, to avoid a feedback
+/// loop.
+#[derive(Clone, Debug, Resource)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "bevy_reflect", reflect(Resource))]
+pub struct TimeTravelledMessageCursor<T: MessageTimeline> {
+    cursor: MessageCursor<T::Message>,
+}
+
+impl<T: MessageTimeline> Default for TimeTravelledMessageCursor<T> {
+    fn default() -> Self {
+        Self {
+            cursor: MessageCursor::default(),
+        }
+    }
+}
+
+/// System run in [`TimeTravelSchedules::Rewinding`] and [`TimeTravelSchedules::Interpolating`].
+///
+/// # Panics
+/// Panics if neither [`RewindTo`] nor [`InterpolateTo`] resources exist for this timeline's
+/// continuum.
+pub fn message_rewind_to<T: MessageTimeline>(
+    rewind_to: Option<Res<RewindTo<T::Continuum>>>,
+    interpolate_to: Option<Res<InterpolateTo<T::Continuum>>>,
+    buf: Option<Res<T>>,
+    mut output: ResMut<Messages<T::Message>>,
+    mut output_reversed: ResMut<Messages<Reverse<T::Message>>>,
+    mut cursor: ResMut<TimeTravelledMessageCursor<T>>,
+) {
+    let Some(buf) = buf else {
+        return;
+    };
+
+    let rewind_to = if let Some(rewind_to) = rewind_to {
+        (rewind_to.clone()).into()
+    } else if let Some(interpolate_to) = interpolate_to {
+        interpolate_to.clone()
+    } else {
+        panic!("Either `RewindTo` or `InterpolateTo` resource should be present.");
+    };
+
+    let Some(from) = rewind_to.from else {
+        // Nothing to rewind *from*, meaning we don't know what time period to grab messages for.
+        return;
+    };
+
+    let reverse = from > rewind_to.to;
+
+    let iter = buf.rewind_from_to_nonchronological(from, rewind_to.to);
+
+    if reverse {
+        for message in iter.rev() {
+            output_reversed.write(Reverse(message.message.clone()));
+        }
+    } else {
+        for message in iter {
+            output.write(message.message.clone());
+        }
+    }
+
+    // Reset the cursor.
+    cursor.cursor = output.get_cursor_current();
+}
+
+/// System run in [`TimeTravelSchedules::RotatingBuffers`].
+pub fn message_rotate_buffers<T: MessageTimeline>(
+    rotate_buffers: Res<RotateBuffers<T::Continuum>>,
+    buf: Option<ResMut<T>>,
+    messages: Res<Messages<T::Message>>,
+    mut cursor: ResMut<TimeTravelledMessageCursor<T>>,
+) {
+    let Some(mut buf) = buf else {
+        return;
+    };
+
+    buf.delete_before(rotate_buffers.delete_before);
+
+    for item in cursor.cursor.read(&messages) {
+        buf.push(TimedMessage {
+            time: rotate_buffers.current_time,
+            message: item.clone(),
+        });
+    }
+}
+
+/// System run in [`TimeTravelSchedules::DeletingAfter`].
+pub fn message_delete_after<T: MessageTimeline>(
+    delete_after: Res<DeleteAfter<T::Continuum>>,
+    buf: Option<ResMut<T>>,
+) {
+    if let Some(mut buf) = buf {
+        buf.delete_after(delete_after.delete_after);
+    }
+}
+
+/// System run in [`TimeTravelSchedules::Clearing`].
+pub fn message_clear<T: MessageTimeline>(buf: Option<ResMut<T>>) {
+    if let Some(mut buf) = buf {
+        buf.clear();
+    }
+}
+
+/// System run in [`TimeTravelSchedules::AccountingForChanges`].
+pub fn message_account_for_changes<T: MessageTimeline>(
+    account_for_changes: Res<AccountForChanges<T::Continuum>>,
+    buf: Option<ResMut<T>>,
+    mut messages: MessageReader<T::Message>,
+) {
+    if let Some(mut buf) = buf {
+        if messages.is_empty() {
+            // No changes, nothing to do :D
+            return;
+        }
+        // Aight, something changed.
+
+        account_for_changes
+            .change_detected
+            .store(true, core::sync::atomic::Ordering::Relaxed);
+
+        if let Some(overwrite_range) = &account_for_changes.overwrite_range {
+            // Do the overwrites in question.
+            buf.overwrite_range(overwrite_range, messages.read().cloned());
+        }
+
+        messages.clear();
     }
 }

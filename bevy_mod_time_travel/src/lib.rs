@@ -17,6 +17,12 @@ extern crate alloc;
 /// [`RewindBuffer<T>`]: rewind_buffer::RewindBuffer<T>
 pub mod rewind_buffer;
 
+/// Module for [`TimedMessage<M>`] and [`TimedMessagesBuffer<M>`].
+///
+/// [`TimedMessage<M>`]: timed_messages_buffer::TimedMessage<M>
+/// [`TimedMessagesBuffer<M>`]: timed_messages_buffer::TimedMessagesBuffer<M>
+pub mod timed_messages_buffer;
+
 /// Module for [`Timeline`] and [`Continuum`], traits to organize all time travel state and do
 /// useful things.
 ///
@@ -63,6 +69,8 @@ pub mod world_methods;
 #[cfg(feature = "interpolation")]
 pub mod interpolation;
 
+// Some fancy misc stuff
+
 /// An auto trait for functions that do interpolation over T, with additional trait bounds needed
 /// for this to be stored inside a closure used as a Bevy system.
 pub trait InterpFunc<T>: FnMut(&T, &T, f32) -> T + Copy + Send + Sync + 'static {}
@@ -100,9 +108,10 @@ impl core::error::Error for OutOfRecordedRangeError {
 
 /// Re-exports of common types needed for implementing timelines and utilizing time travel.
 pub mod prelude {
-    pub use super::continuum::{Continuum, Timeline};
+    pub use super::continuum::{Continuum, MessageTimeline, Timeline};
     pub use super::rewind_buffer::{Moment, RewindBuffer};
     pub use super::schedules::{OutOfTimelineRangePolicy, TickRestorePolicy};
+    pub use super::timed_messages_buffer::{Reverse, TimedMessage, TimedMessagesBuffer};
     pub use super::world_methods::WorldTimeTravel;
     pub use bevy_ecs::schedule::ScheduleLabel;
     pub use core::time::Duration;

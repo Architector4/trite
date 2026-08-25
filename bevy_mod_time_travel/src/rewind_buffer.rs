@@ -1,5 +1,5 @@
 use alloc::collections::vec_deque::{Iter, VecDeque};
-use bevy_ecs::change_detection::{ComponentTicks, DetectChanges, DetectChangesMut};
+use bevy_ecs::change_detection::{ComponentTicks, DetectChanges, DetectChangesMut, Tick};
 use core::{ops::RangeInclusive, time::Duration};
 
 #[cfg(feature = "bevy_animation")]
@@ -34,6 +34,19 @@ pub struct ChangeDetectionState {
 }
 
 impl ChangeDetectionState {
+    /// Return a dummy instance with both added and changed ticks to 0 and last detected change set
+    /// to no change.
+    #[must_use]
+    pub fn dummy() -> Self {
+        Self {
+            ticks: ComponentTicks {
+                added: Tick::new(0),
+                changed: Tick::new(0),
+            },
+            change: LastDetectedChange::NoChange,
+        }
+    }
+
     /// Set change ticks held within this state to this value. This does not take into account the
     /// fact that change ticks warp, so it might still trigger "changed" or "added" state that was
     /// not there before.
@@ -528,28 +541,30 @@ impl<T> RewindBuffer<T> {
         Ok(self.find_for_interpolation(time)?.pick_b())
     }
 
-    /// Insert a new moment into the buffer with correct ordering.
+    /// Insert a new moment into the buffer with correct ordering, returning a reference.
     ///
     /// This function finds the correct spot in the buffer to insert the new moment into, then
-    /// inserts it. The search is done in O(n) time. If you know that your moment comes after the
-    /// last moment in the buffer, it's better to use [`Self::push`] instead.
+    /// inserts it, and provides an `Ok(`[`MomentMutProxy<T>`]`)` for it. The search is done in O(n)
+    /// time. If you know that your moment comes after the last moment in the buffer, it's better to
+    /// use [`Self::push`] instead.
     ///
     /// # Errors
     /// Errors if a moment already exists in the buffer at exactly the same time as the provided
-    /// one. In this case, the [`MomentMutProxy<T>`] is returned for the matching moment, letting
+    /// one. In this case, the `Err(`[`MomentMutProxy<T>`]`)` is returned for the matching moment, letting
     /// the caller handle the case.
-    pub fn insert_in_order(&mut self, new: Moment<T>) -> Result<(), MomentMutProxy<'_, T>> {
+    pub fn insert_in_order(
+        &mut self,
+        new: Moment<T>,
+    ) -> Result<MomentMutProxy<'_, T>, MomentMutProxy<'_, T>> {
         // First, quick check against the earliest moment.
         let Some(first) = self.first_moment() else {
             // No moments in the buffer? Just slap it in then lol
-            self.moments.push_back(new);
-            return Ok(());
+            return Ok(self.moments.push_back_mut(new).as_proxy());
         };
 
         if new.time < first.time {
             // New moment is earlier than the first moment. Slap it in at the start lol
-            self.moments.push_front(new);
-            return Ok(());
+            return Ok(self.moments.push_front_mut(new).as_proxy());
         }
 
         for (idx, moment) in self.moments.iter().enumerate().rev() {
@@ -561,7 +576,7 @@ impl<T> RewindBuffer<T> {
                 // New moment is later than this one, but presumably earlier than all the other ones
                 // that were checked. Insert here.
                 self.moments.insert(idx + 1, new);
-                return Ok(());
+                return Ok(self.moments[idx + 1].as_proxy());
             }
         }
 
@@ -578,7 +593,8 @@ impl<T> RewindBuffer<T> {
     /// # Panics
     ///
     /// Panics if this moment is earlier than or at the same time as the currently last recorded
-    /// moment, because that violates the internal ordering.
+    /// moment, because that violates the internal ordering. If you need to insert a moment at an
+    /// arbitrary time, use [`Self::insert_in_order`] instead.
     pub fn push(&mut self, new: Moment<T>) {
         if let Some(last) = self.last_moment() {
             assert!(
@@ -665,6 +681,8 @@ impl<T> RewindBuffer<T> {
     /// Panics if the two provided moments have the exact same time. If you need to do that, use
     /// [`Self::insert_in_order`] instead.
     pub fn overwrite_range_with_moments(&mut self, a: Moment<T>, b: Moment<T>) {
+        // This is kind of like VecDeque::splice, which is unstable at time of writing.
+
         use core::cmp::Ordering;
         let (from, to) = match a.time.cmp(&b.time) {
             Ordering::Less => (a, b),
