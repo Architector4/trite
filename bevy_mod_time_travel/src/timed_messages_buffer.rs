@@ -28,13 +28,13 @@ impl<M> AsMut<M> for Reverse<M> {
         &mut self.0
     }
 }
-impl<M> std::ops::Deref for Reverse<M> {
+impl<M> Deref for Reverse<M> {
     type Target = M;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
-impl<M> std::ops::DerefMut for Reverse<M> {
+impl<M> DerefMut for Reverse<M> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
