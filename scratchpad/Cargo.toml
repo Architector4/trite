@@ -1,3 +1,6 @@
+# CURRENTLY BROKEN because those dependencies didn't update to bevy 0.20 yet lol
+
+
 [package]
 name = "scratchpad"
 version = "0.1.0"
