@@ -1,15 +1,12 @@
-# CURRENTLY BROKEN because those dependencies didn't update to bevy 0.20 yet lol
-
-
 [package]
 name = "scratchpad"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = { version = "0.19.0", features = ["track_location"] }
-bevy-inspector-egui = "0.37.0"
-bevy_egui = "0.40.0"
+bevy = { version = "0.20.0", features = ["track_location"] }
+bevy-inspector-egui = "0.38.0"
+bevy_egui = "0.43.1"
 bevy_mod_time_travel = { version = "0.1.0", path = "../bevy_mod_time_travel" }
 #avian3d = { version = "0.6.0", default-features = false, features = ["3d", "default-collider", "parry-f64", "parallel", "simd", "debug-plugin", "f64"] }
-avian3d = { version = "0.7.0" }
+avian3d = { version = "0.8.0" }

@@ -17,8 +17,7 @@ bevy_ecs = { version = "0.20.0", default-features = false }
 
 # For when not using std feature; unused otherwise.
 # Note: bevy_ecs depends on bevy_platform which enables spin features "mutex" and "spin_mutex" unconditionally.
-# A little outdated, but as of Bevy 0.19 this is the same version as what's in use in bevy_platform
-spin = { version = "0.10.0", default-features = false }
+spin = { version = "0.12.3", default-features = false }
 
 # For interpolation feature.
 bevy_time = { version = "0.20.0", default-features = false, optional = true }

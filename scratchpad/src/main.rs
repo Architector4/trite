@@ -281,8 +281,8 @@ fn control(
     mut events_local: Local<VecDeque<KeyboardInput>>,
     mut input: Local<ButtonInput<KeyCode>>,
 ) {
-    use avian3d::math::Scalar as AScalar;
-    use avian3d::math::Vector as AVec;
+    use avian3d::math::RVector;
+    use avian3d::math::Real;
 
     let relevant = &[
         KeyCode::KeyA,
@@ -311,22 +311,22 @@ fn control(
         ($in_neg: expr, $in_pos: expr) => {{ i8::from(input.pressed($in_pos)) - i8::from(input.pressed($in_neg)) }};
     }
 
-    let movement = AVec::new(
-        AScalar::from(input_as_signum!(KeyCode::KeyA, KeyCode::KeyD)),
-        AScalar::from(input_as_signum!(KeyCode::ControlLeft, KeyCode::Space)),
-        AScalar::from(input_as_signum!(KeyCode::KeyW, KeyCode::KeyS)),
+    let movement = RVector::new(
+        Real::from(input_as_signum!(KeyCode::KeyA, KeyCode::KeyD)),
+        Real::from(input_as_signum!(KeyCode::ControlLeft, KeyCode::Space)),
+        Real::from(input_as_signum!(KeyCode::KeyW, KeyCode::KeyS)),
     );
 
     //for mut entity in cube.iter_mut() {
     //    entity.0.translation += 0.0;
     //}
 
-    if movement == AVec::ZERO {
+    if movement == RVector::ZERO {
         return;
     }
 
     for (mut position, _control) in cube.iter_mut() {
-        position.0 += movement * (time.delta_secs_f64() * 5.0) as AScalar;
+        position.0 += movement * (time.delta_secs_f64() * 5.0) as Real;
     }
 }
 
