@@ -209,7 +209,6 @@ impl<M> TimedMessagesBuffer<M> {
     /// duplicates.
     ///
     /// If you need messages for exactly the `from` time, use [`Self::find_messages_exact`].
-    #[must_use]
     pub fn rewind_from_to_nonchronological(
         &self,
         from: Duration,

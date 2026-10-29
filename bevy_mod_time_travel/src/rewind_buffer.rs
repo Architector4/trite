@@ -759,7 +759,6 @@ impl<T> RewindBuffer<T> {
     }
 
     /// Returns an iterator over proxies for all moments.
-    #[must_use]
     pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = MomentMutProxy<'_, T>> {
         self.moments.iter_mut().map(|m| m.as_proxy())
     }
